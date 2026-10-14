@@ -14,7 +14,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Badge } from '@/components/ui/badge'
 import { Button, buttonVariants } from '@/components/ui/button'
-import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { useApiQuery, useFinanceData } from '@/hooks/useFinanceData'
 import { describeSchedule, FLOW_TYPES, VARIABLE_TYPES } from '@/lib/flowTypes'
@@ -41,8 +41,7 @@ export function HistoryTable({ onEdit, className }) {
   return (
     <Card className={cn('gap-4', className)}>
       <CardHeader>
-        <CardTitle>History</CardTitle>
-        <CardDescription>Movimientos variables: gastos e ingresos puntuales o temporales</CardDescription>
+        <CardTitle className="text-sm tracking-wide uppercase">History</CardTitle>
         <CardAction>
           {loading && <LoaderCircle className="text-muted-foreground size-4 animate-spin" aria-label="Cargando" />}
         </CardAction>

@@ -28,9 +28,12 @@ Aplicación web progresiva (PWA) de finanzas personales minimalista orientada a 
 * Es el patrimonio **al empezar** esa fecha: los flujos desde ese día se suman o restan a partir de él y los anteriores reconstruyen la curva hacia atrás. Sin fecha, es el saldo previo a cualquier flujo.
 
 ### Lógica de Visualización y Responsividad
-* **Selector `D M A`:** Cambia la resolución temporal de la gráfica (Días, Meses, Años).
+* **Vista PC:** encabezado con `finan` a la izquierda y, a la derecha, el valor del portfolio y el engranaje de ajustes. Debajo, dos columnas: a la izquierda la gráfica `EVOLUCIÓN PATRIMONIO` y `HISTORY`; a la derecha, la pila de los 4 botones de flujo.
+* **Vista Móvil:** encabezado solo con el valor del portfolio (y el engranaje arriba a la derecha). Gráfica a todo el ancho, sin tarjeta ni ejes (estilo Trade Republic), y debajo los 4 botones apilados.
+* **Selector `D M A`:** integrado dentro de la gráfica, en la esquina inferior derecha. Cambia la resolución temporal (Días, Meses, Años).
+* **Botones de flujo:** orden fijo GFM, GVM, IFM, IVM, con icono de arrastre a la izquierda. Son el único punto para añadir flujos (no hay botón `+` global).
 * **Sección History (Histórico):** **Exclusiva para la vista de PC** (ubicada debajo de la gráfica). Lista y detalla el historial de movimientos **variables** (gastos e ingresos temporales/puntuales).
-* **Barra de Controles:** Selector de Modo Noche/Luz y botón `+` de acción rápida para el registro de flujos.
+* **Ajustes (engranaje):** modal con el interruptor de Modo Oscuro/Claro y el patrimonio inicial.
 
 ## 4. Estructura del Repositorio
 
@@ -49,10 +52,10 @@ Aplicación web progresiva (PWA) de finanzas personales minimalista orientada a 
     ├── src/
     │   ├── components/
     │   │   ├── ui/         # Componentes shadcn/ui (Button, Card, Dialog, Select, Table, ToggleGroup…)
-    │   │   └── *.jsx       # Gráfica, botones y modal de flujo, patrimonio inicial, History, barra de acción
+    │   │   └── *.jsx       # Gráfica (con selector D M A), botones y modal de flujo, Ajustes, History
     │   ├── views/          # Dashboard principal (Layout PC vs. Mobile)
     │   ├── api/            # Cliente Fetch de la API (VITE_API_URL; por defecto, puerto 8000 del mismo host)
-    │   ├── hooks/          # useTheme (modo noche/luz) y useFinanceData (recarga tras cambios)
+    │   ├── hooks/          # useTheme (modo noche/luz), useFinanceData (recarga tras cambios), useMediaQuery
     │   ├── lib/            # Formato (€, fechas), metadatos de los tipos de flujo, cn()
     │   └── App.jsx
     ├── public/             # Favicon e iconos de la PWA (192, 512, maskable, apple-touch-icon)
