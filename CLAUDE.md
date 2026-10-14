@@ -46,7 +46,7 @@ Aplicación web progresiva (PWA) de finanzas personales minimalista orientada a 
 /
 ├── api/index.py            # Entrada de la función Python en Vercel (importa backend/app)
 ├── vercel.json             # Build del frontend, función Python y reescritura /api/*
-├── requirements.txt        # Dependencias de la función (remite a backend/requirements.txt)
+├── requirements.txt        # Dependencias Python (las usa Vercel; backend/requirements.txt remite aquí)
 ├── DEPLOY.md               # Guía de despliegue en Vercel + Neon
 ├── backend/
 │   ├── app/
@@ -56,7 +56,7 @@ Aplicación web progresiva (PWA) de finanzas personales minimalista orientada a 
 │   │   ├── auth.py         # Acceso con contraseña (APP_PASSWORD) y token de sesión
 │   │   ├── projection.py   # Motor de cálculo del patrimonio proyectado
 │   │   └── main.py         # App FastAPI bajo /api: health, auth, CRUD flows, settings y projection
-│   ├── requirements.txt
+│   ├── requirements.txt    # `-r ../requirements.txt`
 │   └── venv/
 └── frontend/
     ├── src/
