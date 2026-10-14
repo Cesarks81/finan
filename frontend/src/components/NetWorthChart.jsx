@@ -11,28 +11,17 @@ import {
   YAxis,
 } from 'recharts'
 
-import { api } from '@/api/client'
 import { GranularitySelector } from '@/components/GranularitySelector'
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { useApiQuery, useFinanceData } from '@/hooks/useFinanceData'
+import { useFinanceData } from '@/hooks/useFinanceData'
 import { useIsDesktop } from '@/hooks/useMediaQuery'
 import {
-  addDays,
-  addMonths,
   currentPeriod,
   formatEUR,
   formatEURCompact,
   formatPeriod,
-  toISODate,
 } from '@/lib/format'
 import { cn } from '@/lib/utils'
-
-// Ventana que se pide a la API para cada vista: un poco de pasado y la proyección futura.
-const RANGES = {
-  D: { start: (t) => addDays(t, -14), end: (t) => addDays(t, 30) },
-  M: { start: (t) => addMonths(t, -6), end: (t) => addMonths(t, 12) },
-  A: { start: (t) => new Date(t.getFullYear() - 2, 0, 1), end: (t) => new Date(t.getFullYear() + 8, 11, 31) },
-}
 
 const axisTick = { fill: 'var(--muted-foreground)', fontSize: 12 }
 
@@ -70,17 +59,10 @@ export function NetWorthChart({ className }) {
   const gradientId = useId()
   const isDesktop = useIsDesktop()
   const [granularity, setGranularity] = useState('M')
-  const { version } = useFinanceData()
-  const range = RANGES[granularity]
-
-  const { data, error, loading } = useApiQuery(() => {
-    const today = new Date()
-    return api.getProjection({
-      granularity,
-      start: toISODate(range.start(today)),
-      end: toISODate(range.end(today)),
-    })
-  }, [granularity, version])
+  // Las tres vistas ya están en memoria: cambiar de una a otra no hace peticiones.
+  const { projections } = useFinanceData()
+  const { error, loading } = projections
+  const data = projections.data?.[granularity]
 
   const points = useMemo(
     () =>
@@ -93,8 +75,6 @@ export function NetWorthChart({ className }) {
     [data],
   )
   const hasNegative = points.some((p) => p.balance < 0)
-  // Mientras llega la respuesta de otra vista, `points` aún es de la anterior.
-  const stale = data?.granularity !== granularity
 
   return (
     <Card
@@ -118,7 +98,7 @@ export function NetWorthChart({ className }) {
               {error.message}
             </div>
           ) : (
-            !stale && (
+            data && (
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart
                   data={points}

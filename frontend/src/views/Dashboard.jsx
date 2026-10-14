@@ -1,25 +1,20 @@
 import { useState } from 'react'
 import { Settings } from 'lucide-react'
 
-import { api } from '@/api/client'
 import { FlowButtons } from '@/components/FlowButtons'
 import { FlowDialog } from '@/components/FlowDialog'
 import { HistoryTable } from '@/components/HistoryTable'
 import { NetWorthChart } from '@/components/NetWorthChart'
 import { SettingsDialog } from '@/components/SettingsDialog'
 import { Button } from '@/components/ui/button'
-import { useApiQuery, useFinanceData } from '@/hooks/useFinanceData'
-import { formatEUR, toISODate } from '@/lib/format'
+import { useFinanceData } from '@/hooks/useFinanceData'
+import { formatEUR } from '@/lib/format'
 import { cn } from '@/lib/utils'
 
 /** Patrimonio total a día de hoy. En PC lleva la etiqueta visible; en móvil, solo la cifra. */
 function PortfolioValue() {
-  const { version } = useFinanceData()
-  const { data } = useApiQuery(() => {
-    const today = toISODate(new Date())
-    return api.getProjection({ granularity: 'D', start: today, end: today })
-  }, [version])
-  const balance = data?.points[0]?.balance
+  // Sale de la vista de días ya cargada para la gráfica, que incluye hoy.
+  const balance = useFinanceData().projections.data?.todayBalance
 
   return (
     <p className="flex items-baseline gap-3">

@@ -30,7 +30,7 @@ Aplicación web progresiva (PWA) de finanzas personales minimalista orientada a 
 ### Lógica de Visualización y Responsividad
 * **Vista PC:** encabezado con `finan` a la izquierda y, a la derecha, el valor del portfolio y el engranaje de ajustes. Debajo, dos columnas: a la izquierda la gráfica `EVOLUCIÓN PATRIMONIO` y `HISTORY`; a la derecha, la pila de los 4 botones de flujo.
 * **Vista Móvil:** encabezado solo con el valor del portfolio (y el engranaje arriba a la derecha). Gráfica a todo el ancho, sin tarjeta ni ejes (estilo Trade Republic), y debajo los 4 botones apilados. Pantalla fija sin scroll (`h-dvh`, `overscroll-behavior: none`): la gráfica ocupa el alto que dejan libre el encabezado y los botones, y tiene `touch-action: none` para que arrastrar el dedo solo mueva el indicador.
-* **Selector `D M A`:** integrado dentro de la gráfica, en la esquina inferior derecha. Cambia la resolución temporal (Días, Meses, Años).
+* **Selector `D M A`:** integrado dentro de la gráfica, en la esquina inferior derecha. Cambia la resolución temporal (Días, Meses, Años). Las tres vistas se piden juntas al cargar (`lib/projections.js`) y quedan en caché en `FinanceDataProvider`: cambiar de vista no hace peticiones. Solo se vuelven a pedir tras un cambio de datos (`refresh()`), mostrando las anteriores mientras llegan. El patrimonio del encabezado sale de la vista de días.
 * **Botones de flujo:** orden fijo GFM, GVM, IFM, IVM, con icono de arrastre a la izquierda. Son el único punto para añadir flujos (no hay botón `+` global).
 * **Sección History (Histórico):** **Exclusiva para la vista de PC** (ubicada debajo de la gráfica). Lista y detalla el historial de movimientos **variables** (gastos e ingresos temporales/puntuales).
 * **Ajustes (engranaje):** modal con el interruptor de Modo Oscuro/Claro, el patrimonio inicial y, si hay contraseña, «Cerrar sesión en este dispositivo».
@@ -67,7 +67,7 @@ Aplicación web progresiva (PWA) de finanzas personales minimalista orientada a 
     │   ├── views/          # Dashboard principal (Layout PC vs. Mobile)
     │   ├── api/            # Cliente Fetch de la API (`/api` del mismo dominio; envía el token de sesión)
     │   ├── hooks/          # useTheme, useAuth, useFinanceData (recarga tras cambios), useMediaQuery
-    │   ├── lib/            # Formato (€, fechas), metadatos de los tipos de flujo, cn()
+    │   ├── lib/            # Formato (€, fechas), tipos de flujo, carga de las 3 vistas (projections.js), cn()
     │   └── App.jsx
     ├── public/             # Favicon e iconos de la PWA (192, 512, maskable, apple-touch-icon)
     ├── vite.config.js      # Alias @/, Tailwind y PWA (vite-plugin-pwa: manifest + service worker)

@@ -3,8 +3,9 @@ import { createContext, useContext, useEffect, useState } from 'react'
 export const FinanceDataContext = createContext(null)
 
 /**
- * `version` cambia cada vez que se crea, edita o elimina un flujo; los componentes
- * que leen de la API la incluyen en sus dependencias para recargarse.
+ * `version` cambia cada vez que se crea, edita o elimina un flujo (o el patrimonio inicial);
+ * los componentes que leen de la API la incluyen en sus dependencias para recargarse.
+ * `projections` ({ data: { D, M, A }, loading, error }) es la caché de las tres vistas de la gráfica.
  */
 export function useFinanceData() {
   const context = useContext(FinanceDataContext)
