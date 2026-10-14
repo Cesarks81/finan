@@ -110,8 +110,9 @@ export function NetWorthChart({ className }) {
           {loading && <LoaderCircle className="text-muted-foreground size-4 animate-spin" aria-label="Cargando" />}
         </CardAction>
       </CardHeader>
-      <CardContent className="px-0 md:px-4">
-        <div className="relative h-72 md:h-80">
+      <CardContent className="flex min-h-0 flex-1 flex-col px-0 md:px-4">
+        {/* touch-none: al arrastrar el dedo por la gráfica solo se mueve el indicador, no la página. */}
+        <div className="relative min-h-40 flex-1 touch-none md:h-80 md:flex-none">
           {error ? (
             <div className="text-muted-foreground flex h-full items-center justify-center px-6 text-center text-sm">
               {error.message}

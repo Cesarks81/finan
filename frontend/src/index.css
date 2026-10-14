@@ -87,6 +87,11 @@
   html {
     color-scheme: light;
   }
+  html,
+  body {
+    /* Sin rebote ni «tirar para recargar» al llegar al borde. */
+    overscroll-behavior: none;
+  }
   html.dark {
     color-scheme: dark;
   }
