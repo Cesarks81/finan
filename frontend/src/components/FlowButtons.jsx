@@ -13,7 +13,7 @@ export function FlowButtons({ onSelect, className }) {
           key={code}
           variant="outline"
           onClick={() => onSelect(code)}
-          className="relative h-auto min-h-16 flex-1 flex-col gap-0.5 rounded-xl px-10 py-3 whitespace-normal md:min-h-20"
+          className="relative h-auto min-h-14 flex-1 flex-col gap-0.5 rounded-xl px-10 py-3 whitespace-normal md:min-h-20"
         >
           <GripVertical aria-hidden className="text-muted-foreground absolute top-1/2 left-3 size-5 -translate-y-1/2" />
           <span className="text-lg font-bold tracking-wide">{code}</span>
