@@ -112,6 +112,8 @@ export function NetWorthChart({ className }) {
             data && (
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart
+                  // Montar de nuevo al cambiar de vista repite la animación de la línea dibujándose.
+                  key={granularity}
                   data={points}
                   margin={isDesktop ? { top: 16, right: 12, left: 4, bottom: 0 } : { top: 16, right: 0, left: 0, bottom: 0 }}
                 >
