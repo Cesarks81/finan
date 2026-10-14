@@ -7,8 +7,9 @@ Sin `APP_PASSWORD` el acceso es libre (desarrollo local), salvo en Vercel, donde
 rechaza hasta que se configure.
 
 Cada 3 contraseñas incorrectas seguidas desde una IP, esa IP queda bloqueada 1 minuto; el
-siguiente bloqueo dura el doble (2, 4, 8… minutos, como mucho 24 horas). Acertar la
-contraseña, o pasar 24 horas sin fallos tras el último bloqueo, vuelve a empezar.
+siguiente bloqueo dura el doble (2, 4, 8… minutos, como mucho 1 hora). Acertar la
+contraseña, o pasar 1 hora sin fallos (contada desde el último fallo o el fin del último
+bloqueo), vuelve a empezar.
 """
 
 import hashlib
@@ -30,8 +31,8 @@ from .models import LoginAttempt
 SESSION_DURATION = timedelta(days=30)
 FAILURES_PER_LOCKOUT = 3
 FIRST_LOCKOUT = timedelta(minutes=1)
-MAX_LOCKOUT = timedelta(hours=24)
-RESET_AFTER = timedelta(hours=24)
+MAX_LOCKOUT = timedelta(hours=1)
+RESET_AFTER = timedelta(hours=1)
 
 
 def now_ts() -> float:

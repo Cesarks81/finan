@@ -31,7 +31,7 @@ Opcional: en **Settings → Functions**, pon la región de las funciones en la m
 
 Cambiar `APP_PASSWORD` (y volver a desplegar) cierra la sesión en todos los dispositivos. Además, cada sesión caduca a los 30 días.
 
-Tras 3 contraseñas incorrectas seguidas, el acceso desde esa conexión (IP) se bloquea 1 minuto; si se repite, 2, 4, 8… minutos (máximo 24 h).
+Tras 3 contraseñas incorrectas seguidas, el acceso desde esa conexión (IP) se bloquea 1 minuto; si se repite, 2, 4, 8… minutos (máximo 1 hora). Tras 1 hora sin fallos, la cuenta vuelve a empezar.
 
 ## 4. Comprobar
 
