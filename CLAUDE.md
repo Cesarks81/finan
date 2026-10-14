@@ -37,7 +37,8 @@ Aplicación web progresiva (PWA) de finanzas personales minimalista orientada a 
 
 ### Despliegue y Acceso
 * **Producción:** Vercel sirve el frontend estático y ejecuta la API como función Python (`api/index.py`; `vercel.json` envía ahí `/api/*`). La base de datos es Postgres en Neon. Guía paso a paso en `DEPLOY.md`.
-* **Contraseña (`APP_PASSWORD`):** si está definida, las rutas de datos exigen `Authorization: Bearer <token>`; el token se obtiene en `POST /api/auth/login` (firma HMAC de la contraseña: cambiarla cierra todas las sesiones). `/api/health` y `/api/auth/*` son públicas. Sin `APP_PASSWORD` el acceso es libre en local, pero en Vercel se rechaza todo hasta configurarla.
+* **Contraseña (`APP_PASSWORD`):** si está definida, las rutas de datos exigen `Authorization: Bearer <token>`; el token se obtiene en `POST /api/auth/login`, tiene la forma `<caducidad>.<firma HMAC>` y **caduca a los 30 días** (firmado con la contraseña: cambiarla cierra todas las sesiones). `/api/health` y `/api/auth/*` son públicas. Sin `APP_PASSWORD` el acceso es libre en local, pero en Vercel se rechaza todo hasta configurarla.
+* **Bloqueo por intentos fallidos:** cada 3 contraseñas incorrectas seguidas desde una IP, esa IP queda bloqueada (429 con `Retry-After`) 1 minuto, luego 2, 4, 8… (máximo 24 h). Durante el bloqueo se rechaza incluso la contraseña correcta. Acertar, o pasar 24 h sin fallos tras el último bloqueo, reinicia la cuenta. Se guarda en la tabla `login_attempts` (no en memoria, porque Vercel reparte las peticiones entre instancias) y la fila se bloquea durante cada intento para que los intentos simultáneos se cuenten de uno en uno. En Vercel la IP sale de `x-real-ip`/`x-forwarded-for`, que Vercel sobrescribe.
 * **Frontend:** `AuthGate` consulta `/api/auth/status` y muestra la pantalla de acceso si hace falta; guarda el token en `localStorage` y vuelve al acceso ante cualquier 401.
 
 ## 4. Estructura del Repositorio
@@ -50,10 +51,10 @@ Aplicación web progresiva (PWA) de finanzas personales minimalista orientada a 
 ├── DEPLOY.md               # Guía de despliegue en Vercel + Neon
 ├── backend/
 │   ├── app/
-│   │   ├── models.py       # Modelos SQLAlchemy: Flow (tabla única; tipo GFM/GVM/IFM/IVM) y Settings
+│   │   ├── models.py       # Modelos SQLAlchemy: Flow (tabla única; tipo GFM/GVM/IFM/IVM), Settings y LoginAttempt
 │   │   ├── schemas.py      # Validaciones Pydantic
 │   │   ├── database.py     # Conexión: SQLite en local, Postgres con DATABASE_URL; crea las tablas
-│   │   ├── auth.py         # Acceso con contraseña (APP_PASSWORD) y token de sesión
+│   │   ├── auth.py         # Contraseña (APP_PASSWORD), token de 30 días y bloqueo por intentos fallidos
 │   │   ├── projection.py   # Motor de cálculo del patrimonio proyectado
 │   │   └── main.py         # App FastAPI bajo /api: health, auth, CRUD flows, settings y projection
 │   ├── requirements.txt    # `-r ../requirements.txt`

@@ -5,20 +5,19 @@ esta app como función Python y el resto lo sirve el frontend estático).
 """
 
 import os
-import time
 from datetime import date, timedelta
 from decimal import Decimal
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, FastAPI, Header, HTTPException, Query, Response, status
+from fastapi import APIRouter, Depends, FastAPI, Header, HTTPException, Query, Request, Response, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import ValidationError
 from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
-from . import models, schemas
-from .auth import app_password, auth_required, check_password, is_authenticated, require_auth, session_token
+from . import auth, models, schemas
+from .auth import app_password, auth_required, is_authenticated, require_auth
 from .database import get_db
 from .projection import add_months, build_periods, project
 
@@ -68,15 +67,12 @@ def auth_status(authorization: Annotated[str | None, Header()] = None) -> schema
 
 
 @public.post("/auth/login", response_model=schemas.LoginResponse, tags=["sesión"])
-def login(payload: schemas.LoginRequest) -> schemas.LoginResponse:
+def login(payload: schemas.LoginRequest, request: Request, db: DbSession) -> schemas.LoginResponse:
     if not auth_required():
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Esta instalación no usa contraseña")
     if app_password() is None:
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "Falta configurar APP_PASSWORD en el servidor")
-    if not check_password(payload.password):
-        time.sleep(1)  # Frena los intentos de adivinar la contraseña.
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Contraseña incorrecta")
-    return schemas.LoginResponse(token=session_token(payload.password))
+    return schemas.LoginResponse(token=auth.login(db, request, payload.password))
 
 
 # --- Flujos ----------------------------------------------------------------

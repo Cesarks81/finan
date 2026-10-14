@@ -70,3 +70,19 @@ class Settings(Base):
     initial_balance: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=Decimal(0))
     balance_date: Mapped[date | None] = mapped_column(Date, default=None)
     updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
+
+
+class LoginAttempt(Base):
+    """Intentos fallidos de acceso por IP, para bloquear temporalmente tras varios fallos.
+
+    Se guarda en la base de datos (y no en memoria) porque en Vercel cada petición puede
+    llegar a una instancia distinta de la función.
+    """
+
+    __tablename__ = "login_attempts"
+
+    ip: Mapped[str] = mapped_column(String(64), primary_key=True)
+    failures: Mapped[int] = mapped_column(Integer, default=0)  # fallos desde el último bloqueo
+    lockouts: Mapped[int] = mapped_column(Integer, default=0)  # bloqueos ya aplicados (duplican la espera)
+    locked_until: Mapped[datetime | None] = mapped_column(DateTime, default=None)  # UTC
+    last_failure: Mapped[datetime | None] = mapped_column(DateTime, default=None)  # UTC

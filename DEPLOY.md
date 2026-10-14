@@ -29,7 +29,9 @@ Opcional: en **Settings → Functions**, pon la región de las funciones en la m
 1. En **Settings → Environment Variables**, añade `APP_PASSWORD` con una contraseña larga (una frase de cuatro o cinco palabras sirve) en *Production* y *Preview*.
 2. Las variables solo se aplican a despliegues nuevos: en **Deployments**, abre el último y pulsa **Redeploy**.
 
-Cambiar `APP_PASSWORD` (y volver a desplegar) cierra la sesión en todos los dispositivos.
+Cambiar `APP_PASSWORD` (y volver a desplegar) cierra la sesión en todos los dispositivos. Además, cada sesión caduca a los 30 días.
+
+Tras 3 contraseñas incorrectas seguidas, el acceso desde esa conexión (IP) se bloquea 1 minuto; si se repite, 2, 4, 8… minutos (máximo 24 h).
 
 ## 4. Comprobar
 
