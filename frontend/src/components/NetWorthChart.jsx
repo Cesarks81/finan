@@ -12,7 +12,7 @@ import {
 } from 'recharts'
 
 import { GranularitySelector } from '@/components/GranularitySelector'
-import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useFinanceData } from '@/hooks/useFinanceData'
 import { useIsDesktop } from '@/hooks/useMediaQuery'
 import {
@@ -85,10 +85,21 @@ export function NetWorthChart({ className }) {
       )}
     >
       <CardHeader className="px-4 md:px-6">
-        <CardTitle className="text-sm tracking-wide uppercase">Evolución patrimonio</CardTitle>
-        <CardAction>
-          {loading && <LoaderCircle className="text-muted-foreground size-4 animate-spin" aria-label="Cargando" />}
-        </CardAction>
+        <CardTitle className="flex items-center gap-2 text-sm tracking-wide uppercase">
+          Evolución patrimonio
+          {/* Indicador discreto de actualización: aparece al instante y, al terminar, se queda un
+              momento y se desvanece, para que se note aunque la recarga sea rápida. La gráfica
+              sigue mostrando los datos anteriores y se puede usar mientras tanto. */}
+          <LoaderCircle
+            role={loading ? 'status' : undefined}
+            aria-label={loading ? 'Actualizando' : undefined}
+            aria-hidden={!loading}
+            className={cn(
+              'text-muted-foreground size-3.5 animate-spin transition-opacity',
+              loading ? 'opacity-60 duration-150' : 'opacity-0 delay-300 duration-700',
+            )}
+          />
+        </CardTitle>
       </CardHeader>
       <CardContent className="flex min-h-0 flex-1 flex-col px-0 md:px-4">
         {/* touch-none: al arrastrar el dedo por la gráfica solo se mueve el indicador, no la página. */}
