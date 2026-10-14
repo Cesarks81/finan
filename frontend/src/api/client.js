@@ -7,10 +7,12 @@ const TOKEN_KEY = 'finan-token'
 export const UNAUTHORIZED_EVENT = 'finan:unauthorized'
 
 export class ApiError extends Error {
-  constructor(message, status) {
+  /** `retryAfter`: segundos de espera que indica la API (p. ej. en un bloqueo por intentos fallidos). */
+  constructor(message, status, retryAfter = null) {
     super(message)
     this.name = 'ApiError'
     this.status = status
+    this.retryAfter = retryAfter
   }
 }
 
@@ -62,7 +64,8 @@ async function request(path, { method = 'GET', params, body } = {}) {
   const data = await response.json().catch(() => null)
   if (!response.ok) {
     if (response.status === 401 && !path.startsWith('/auth/')) window.dispatchEvent(new Event(UNAUTHORIZED_EVENT))
-    throw new ApiError(errorMessage(data?.detail, response.status), response.status)
+    const retryAfter = Number(response.headers.get('Retry-After')) || null
+    throw new ApiError(errorMessage(data?.detail, response.status), response.status, retryAfter)
   }
   return data
 }

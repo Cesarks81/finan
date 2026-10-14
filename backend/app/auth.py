@@ -167,10 +167,5 @@ def login(db: Session, request: Request, password: str) -> str:
         db.commit()
         raise _too_many_attempts(wait)
 
-    remaining = FAILURES_PER_LOCKOUT - attempt.failures
     db.commit()
-    raise HTTPException(
-        status.HTTP_401_UNAUTHORIZED,
-        f"Contraseña incorrecta. Te queda{'n' if remaining > 1 else ''} {remaining} "
-        f"intento{'s' if remaining > 1 else ''} antes de un bloqueo temporal.",
-    )
+    raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Contraseña incorrecta")
