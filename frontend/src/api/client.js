@@ -1,4 +1,6 @@
-const API_URL = (import.meta.env.VITE_API_URL ?? 'http://localhost:8000').replace(/\/$/, '')
+// Por defecto, el backend en el puerto 8000 del mismo host que sirve la app
+// (localhost en el PC; la IP del PC al abrirla desde el móvil en la red local).
+const API_URL = (import.meta.env.VITE_API_URL ?? `${location.protocol}//${location.hostname}:8000`).replace(/\/$/, '')
 
 export class ApiError extends Error {
   constructor(message, status) {
@@ -46,4 +48,6 @@ export const api = {
   createFlow: (flow) => request('/flows', { method: 'POST', body: flow }),
   updateFlow: (id, changes) => request(`/flows/${id}`, { method: 'PATCH', body: changes }),
   deleteFlow: (id) => request(`/flows/${id}`, { method: 'DELETE' }),
+  getSettings: () => request('/settings'),
+  updateSettings: (settings) => request('/settings', { method: 'PUT', body: settings }),
 }

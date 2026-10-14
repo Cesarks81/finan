@@ -33,7 +33,10 @@ app = FastAPI(title="Finan API", version="0.1.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=os.getenv("CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173").split(","),
+    # 5173: `pnpm dev`; 4173: `pnpm preview` (build de producción con la PWA).
+    allow_origins=os.getenv(
+        "CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173,http://localhost:4173,http://127.0.0.1:4173"
+    ).split(","),
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -103,6 +106,31 @@ def delete_flow(flow_id: int, db: DbSession) -> Response:
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
+# --- Ajustes (patrimonio inicial) --------------------------------------------
+
+SETTINGS_ID = 1
+
+
+def load_settings(db: Session) -> models.Settings:
+    """Ajustes guardados o, si aún no existen, los valores por defecto (sin persistir)."""
+    return db.get(models.Settings, SETTINGS_ID) or models.Settings(
+        id=SETTINGS_ID, initial_balance=Decimal(0), balance_date=None
+    )
+
+
+@app.get("/settings", response_model=schemas.SettingsRead, tags=["ajustes"])
+def read_settings(db: DbSession) -> models.Settings:
+    return load_settings(db)
+
+
+@app.put("/settings", response_model=schemas.SettingsRead, tags=["ajustes"])
+def update_settings(payload: schemas.SettingsUpdate, db: DbSession) -> models.Settings:
+    settings = db.merge(models.Settings(id=SETTINGS_ID, **payload.model_dump()))
+    db.commit()
+    db.refresh(settings)
+    return settings
+
+
 # --- Proyección de patrimonio ------------------------------------------------
 
 
@@ -121,8 +149,13 @@ def get_projection(
     start: Annotated[date | None, Query(description="Por defecto, hoy")] = None,
     end: Annotated[date | None, Query(description="Por defecto: +30 días (D), +12 meses (M), +10 años (A)")] = None,
     initial_balance: Annotated[
-        Decimal, Query(max_digits=14, decimal_places=2, description="Patrimonio antes de cualquier flujo registrado")
-    ] = Decimal(0),
+        Decimal | None,
+        Query(max_digits=14, decimal_places=2, description="Sustituye al patrimonio inicial guardado en /settings"),
+    ] = None,
+    balance_date: Annotated[
+        date | None,
+        Query(description="Fecha de initial_balance (solo junto a él). Sin ella, es el saldo previo a todo flujo"),
+    ] = None,
 ) -> schemas.ProjectionResponse:
     start = start or date.today()
     end = end or default_end(granularity, start)
@@ -136,11 +169,16 @@ def get_projection(
             f"Rango demasiado amplio: máximo {MAX_POINTS[granularity]} puntos para la vista {granularity.value}",
         )
 
+    if initial_balance is None:
+        settings = load_settings(db)
+        initial_balance, balance_date = settings.initial_balance, settings.balance_date
+
     flows = db.scalars(select(models.Flow)).all()
     return schemas.ProjectionResponse(
         granularity=granularity,
         start=periods[0][1],
         end=periods[-1][2],
         initial_balance=initial_balance,
-        points=project(flows, periods, initial_balance),
+        balance_date=balance_date,
+        points=project(flows, periods, initial_balance, balance_date),
     )

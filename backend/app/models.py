@@ -55,3 +55,18 @@ class Flow(Base):
     @property
     def signed_amount(self) -> Decimal:
         return self.amount if self.flow_type.is_income else -self.amount
+
+
+class Settings(Base):
+    """Configuración del usuario. La app es mono-usuario, así que hay una sola fila (id=1).
+
+    `initial_balance` es el patrimonio neto al empezar `balance_date`, antes de los
+    movimientos de ese día. Sin fecha, es el patrimonio previo a cualquier flujo.
+    """
+
+    __tablename__ = "settings"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    initial_balance: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=Decimal(0))
+    balance_date: Mapped[date | None] = mapped_column(Date, default=None)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())

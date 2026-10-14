@@ -10,6 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from .models import FlowType
 
 Amount = Annotated[Decimal, Field(gt=0, max_digits=12, decimal_places=2)]
+Balance = Annotated[Decimal, Field(max_digits=14, decimal_places=2)]
 
 
 class FlowBase(BaseModel):
@@ -56,6 +57,18 @@ class FlowRead(FlowBase):
     created_at: datetime
 
 
+class SettingsUpdate(BaseModel):
+    initial_balance: Balance = Field(description="Patrimonio neto al empezar balance_date; puede ser negativo")
+    balance_date: date = Field(default_factory=date.today, description="Fecha de ese patrimonio. Por defecto, hoy")
+
+
+class SettingsRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    initial_balance: Decimal
+    balance_date: date | None
+
+
 class Granularity(str, enum.Enum):
     D = "D"  # Días
     M = "M"  # Meses
@@ -76,4 +89,5 @@ class ProjectionResponse(BaseModel):
     start: date
     end: date
     initial_balance: Decimal
+    balance_date: date | None
     points: list[ProjectionPoint]
