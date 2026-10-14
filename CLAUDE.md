@@ -34,10 +34,11 @@ Aplicación web progresiva (PWA) de finanzas personales minimalista orientada a 
 /
 ├── backend/
 │   ├── app/
-│   │   ├── models.py       # Modelos SQLAlchemy (Transaction, RecurringFlow, TemporalFlow)
+│   │   ├── models.py       # Modelo SQLAlchemy Flow (tabla única; tipo GFM/GVM/IFM/IVM)
 │   │   ├── schemas.py      # Validaciones Pydantic
 │   │   ├── database.py     # Conexión SQLite
-│   │   └── main.py         # Endpoints FastAPI y motor de cálculo de patrimonio
+│   │   ├── projection.py   # Motor de cálculo del patrimonio proyectado
+│   │   └── main.py         # App FastAPI: /health, CRUD /flows y /projection
 │   ├── requirements.txt
 │   └── venv/
 └── frontend/
@@ -57,9 +58,10 @@ Aplicación web progresiva (PWA) de finanzas personales minimalista orientada a 
   cd backend
   python -m venv venv
   source venv/bin/activate  # En Windows: venv\Scripts\activate
-  pip install -r requirements.txt  # fastapi, uvicorn, sqlalchemy, alembic, pydantic
+  pip install -r requirements.txt  # fastapi, uvicorn, sqlalchemy, pydantic
   uvicorn app.main:app --reload
   ```
+  La API queda en `http://127.0.0.1:8000` (documentación interactiva en `/docs`). Las tablas se crean al arrancar en `backend/finance.db`; `DATABASE_URL` y `CORS_ORIGINS` permiten cambiar la base de datos y los orígenes permitidos.
 
 * **Frontend (Vite + React + shadcn/ui):**
   ```bash
