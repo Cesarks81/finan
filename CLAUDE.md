@@ -30,6 +30,7 @@ Aplicación web progresiva (PWA) de finanzas personales minimalista orientada a 
 
 ## 4. Estructura del Repositorio
 
+```
 /
 ├── backend/
 │   ├── app/
@@ -40,28 +41,29 @@ Aplicación web progresiva (PWA) de finanzas personales minimalista orientada a 
 │   ├── requirements.txt
 │   └── venv/
 └── frontend/
-├── src/
-│   ├── components/     # Componentes de shadcn/ui (Chart, Dialog, Button, Card, Table)
-│   ├── views/          # Dashboard principal (Layout PC vs. Mobile)
-│   ├── api/            # Cliente de llamadas Axios/Fetch
-│   └── App.jsx
-├── package.json
-└── pnpm-lock.yaml
+    ├── src/
+    │   ├── components/     # Componentes de shadcn/ui (Chart, Dialog, Button, Card, Table)
+    │   ├── views/          # Dashboard principal (Layout PC vs. Mobile)
+    │   ├── api/            # Cliente de llamadas Axios/Fetch
+    │   └── App.jsx
+    ├── package.json
+    └── pnpm-lock.yaml
+```
 
 ## 5. Comandos de Ejecución
+
 * **Backend (FastAPI):**
   ```bash
   cd backend
   python -m venv venv
   source venv/bin/activate  # En Windows: venv\Scripts\activate
-  pip install fastapi uvicorn sqlalchemy pydantic
+  pip install -r requirements.txt  # fastapi, uvicorn, sqlalchemy, alembic, pydantic
   uvicorn app.main:app --reload
+  ```
 
- * Frontend (Vite + React + shadcn/ui):
-   cd frontend
-pnpm install
-pnpm dev
-
-
-Avísame en cuanto lo hayas creado en tu proyecto y te doy el **primer prompt** para empezar a programar el backend.
-
+* **Frontend (Vite + React + shadcn/ui):**
+  ```bash
+  cd frontend
+  pnpm install
+  pnpm dev
+  ```
