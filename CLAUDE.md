@@ -43,10 +43,15 @@ Aplicación web progresiva (PWA) de finanzas personales minimalista orientada a 
 │   └── venv/
 └── frontend/
     ├── src/
-    │   ├── components/     # Componentes de shadcn/ui (Chart, Dialog, Button, Card, Table)
+    │   ├── components/
+    │   │   ├── ui/         # Componentes shadcn/ui (Button, Card, Dialog, Select, Table, ToggleGroup…)
+    │   │   └── *.jsx       # Gráfica, botones de flujo, modal de flujo, History, barra de acción
     │   ├── views/          # Dashboard principal (Layout PC vs. Mobile)
-    │   ├── api/            # Cliente de llamadas Axios/Fetch
+    │   ├── api/            # Cliente Fetch de la API (VITE_API_URL, por defecto http://localhost:8000)
+    │   ├── hooks/          # useTheme (modo noche/luz) y useFinanceData (recarga tras cambios)
+    │   ├── lib/            # Formato (€, fechas), metadatos de los tipos de flujo, cn()
     │   └── App.jsx
+    ├── components.json     # Configuración de shadcn/ui (JSX, estilo new-york)
     ├── package.json
     └── pnpm-lock.yaml
 ```
@@ -67,5 +72,8 @@ Aplicación web progresiva (PWA) de finanzas personales minimalista orientada a 
   ```bash
   cd frontend
   pnpm install
-  pnpm dev
+  pnpm dev     # http://localhost:5173 (necesita el backend arrancado)
+  pnpm build   # build de producción en frontend/dist
+  pnpm lint    # oxlint
   ```
+  Nuevos componentes de shadcn/ui: `pnpm dlx shadcn@latest add <componente>` (usa `components.json`).
