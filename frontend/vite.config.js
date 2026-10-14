@@ -4,8 +4,13 @@ import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
 import { VitePWA } from 'vite-plugin-pwa'
 
+// En local, `/api` se reenvía al backend FastAPI; en Vercel la sirve la función Python.
+const apiProxy = { '/api': { target: 'http://127.0.0.1:8000', changeOrigin: true } }
+
 // https://vite.dev/config/
 export default defineConfig({
+  server: { proxy: apiProxy },
+  preview: { proxy: apiProxy },
   plugins: [
     react(),
     tailwindcss(),
@@ -34,6 +39,7 @@ export default defineConfig({
         // Solo se precachea la app; las llamadas a la API no pasan por la caché.
         globPatterns: ['**/*.{js,css,html,svg,png,webmanifest}'],
         navigateFallback: 'index.html',
+        navigateFallbackDenylist: [/^\/api\//],
       },
     }),
   ],

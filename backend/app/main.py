@@ -1,13 +1,16 @@
-"""API REST de finanzas personales: flujos (GFM, GVM, IFM, IVM) y proyección de patrimonio."""
+"""API REST de finanzas personales: flujos (GFM, GVM, IFM, IVM) y proyección de patrimonio.
+
+Todas las rutas cuelgan de `/api`, igual en local que en Vercel (donde `/api/*` llega a
+esta app como función Python y el resto lo sirve el frontend estático).
+"""
 
 import os
-from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
+import time
 from datetime import date, timedelta
 from decimal import Decimal
 from typing import Annotated
 
-from fastapi import Depends, FastAPI, HTTPException, Query, Response, status
+from fastapi import APIRouter, Depends, FastAPI, Header, HTTPException, Query, Response, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import ValidationError
@@ -15,7 +18,8 @@ from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
 from . import models, schemas
-from .database import Base, engine, get_db
+from .auth import app_password, auth_required, check_password, is_authenticated, require_auth, session_token
+from .database import get_db
 from .projection import add_months, build_periods, project
 
 MAX_POINTS = {schemas.Granularity.D: 1100, schemas.Granularity.M: 600, schemas.Granularity.A: 100}
@@ -23,13 +27,15 @@ MAX_POINTS = {schemas.Granularity.D: 1100, schemas.Granularity.M: 600, schemas.G
 DbSession = Annotated[Session, Depends(get_db)]
 
 
-@asynccontextmanager
-async def lifespan(_: FastAPI) -> AsyncIterator[None]:
-    Base.metadata.create_all(bind=engine)
-    yield
+API_PREFIX = "/api"
 
-
-app = FastAPI(title="Finan API", version="0.1.0", lifespan=lifespan)
+app = FastAPI(
+    title="Finan API",
+    version="0.1.0",
+    docs_url=f"{API_PREFIX}/docs",
+    redoc_url=None,
+    openapi_url=f"{API_PREFIX}/openapi.json",
+)
 
 app.add_middleware(
     CORSMiddleware,
@@ -42,10 +48,35 @@ app.add_middleware(
 )
 
 
-@app.get("/health", tags=["sistema"])
+# Rutas abiertas (salud y sesión) y rutas de datos, que exigen sesión si hay contraseña.
+public = APIRouter(prefix=API_PREFIX)
+private = APIRouter(prefix=API_PREFIX, dependencies=[Depends(require_auth)])
+
+
+@public.get("/health", tags=["sistema"])
 def health(db: DbSession) -> dict[str, str]:
     db.execute(text("SELECT 1"))
     return {"status": "ok", "database": "ok"}
+
+
+# --- Sesión ----------------------------------------------------------------
+
+
+@public.get("/auth/status", response_model=schemas.AuthStatus, tags=["sesión"])
+def auth_status(authorization: Annotated[str | None, Header()] = None) -> schemas.AuthStatus:
+    return schemas.AuthStatus(required=auth_required(), authenticated=is_authenticated(authorization))
+
+
+@public.post("/auth/login", response_model=schemas.LoginResponse, tags=["sesión"])
+def login(payload: schemas.LoginRequest) -> schemas.LoginResponse:
+    if not auth_required():
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Esta instalación no usa contraseña")
+    if app_password() is None:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "Falta configurar APP_PASSWORD en el servidor")
+    if not check_password(payload.password):
+        time.sleep(1)  # Frena los intentos de adivinar la contraseña.
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Contraseña incorrecta")
+    return schemas.LoginResponse(token=session_token(payload.password))
 
 
 # --- Flujos ----------------------------------------------------------------
@@ -58,7 +89,7 @@ def get_flow_or_404(db: Session, flow_id: int) -> models.Flow:
     return flow
 
 
-@app.post("/flows", response_model=schemas.FlowRead, status_code=status.HTTP_201_CREATED, tags=["flujos"])
+@private.post("/flows", response_model=schemas.FlowRead, status_code=status.HTTP_201_CREATED, tags=["flujos"])
 def create_flow(payload: schemas.FlowCreate, db: DbSession) -> models.Flow:
     flow = models.Flow(**payload.model_dump())
     db.add(flow)
@@ -67,7 +98,7 @@ def create_flow(payload: schemas.FlowCreate, db: DbSession) -> models.Flow:
     return flow
 
 
-@app.get("/flows", response_model=list[schemas.FlowRead], tags=["flujos"])
+@private.get("/flows", response_model=list[schemas.FlowRead], tags=["flujos"])
 def list_flows(
     db: DbSession,
     flow_type: Annotated[list[models.FlowType] | None, Query(description="Filtra por uno o varios tipos")] = None,
@@ -78,12 +109,12 @@ def list_flows(
     return list(db.scalars(query))
 
 
-@app.get("/flows/{flow_id}", response_model=schemas.FlowRead, tags=["flujos"])
+@private.get("/flows/{flow_id}", response_model=schemas.FlowRead, tags=["flujos"])
 def read_flow(flow_id: int, db: DbSession) -> models.Flow:
     return get_flow_or_404(db, flow_id)
 
 
-@app.patch("/flows/{flow_id}", response_model=schemas.FlowRead, tags=["flujos"])
+@private.patch("/flows/{flow_id}", response_model=schemas.FlowRead, tags=["flujos"])
 def update_flow(flow_id: int, payload: schemas.FlowUpdate, db: DbSession) -> models.Flow:
     flow = get_flow_or_404(db, flow_id)
     current = schemas.FlowCreate.model_validate(flow, from_attributes=True).model_dump()
@@ -99,7 +130,7 @@ def update_flow(flow_id: int, payload: schemas.FlowUpdate, db: DbSession) -> mod
     return flow
 
 
-@app.delete("/flows/{flow_id}", status_code=status.HTTP_204_NO_CONTENT, tags=["flujos"])
+@private.delete("/flows/{flow_id}", status_code=status.HTTP_204_NO_CONTENT, tags=["flujos"])
 def delete_flow(flow_id: int, db: DbSession) -> Response:
     db.delete(get_flow_or_404(db, flow_id))
     db.commit()
@@ -118,12 +149,12 @@ def load_settings(db: Session) -> models.Settings:
     )
 
 
-@app.get("/settings", response_model=schemas.SettingsRead, tags=["ajustes"])
+@private.get("/settings", response_model=schemas.SettingsRead, tags=["ajustes"])
 def read_settings(db: DbSession) -> models.Settings:
     return load_settings(db)
 
 
-@app.put("/settings", response_model=schemas.SettingsRead, tags=["ajustes"])
+@private.put("/settings", response_model=schemas.SettingsRead, tags=["ajustes"])
 def update_settings(payload: schemas.SettingsUpdate, db: DbSession) -> models.Settings:
     settings = db.merge(models.Settings(id=SETTINGS_ID, **payload.model_dump()))
     db.commit()
@@ -142,7 +173,7 @@ def default_end(granularity: schemas.Granularity, start: date) -> date:
     return date(start.year + 9, 12, 31)
 
 
-@app.get("/projection", response_model=schemas.ProjectionResponse, tags=["patrimonio"])
+@private.get("/projection", response_model=schemas.ProjectionResponse, tags=["patrimonio"])
 def get_projection(
     db: DbSession,
     granularity: schemas.Granularity = schemas.Granularity.M,
@@ -182,3 +213,7 @@ def get_projection(
         balance_date=balance_date,
         points=project(flows, periods, initial_balance, balance_date),
     )
+
+
+app.include_router(public)
+app.include_router(private)

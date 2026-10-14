@@ -7,3 +7,6 @@ backend/*.db
 # Node
 node_modules/
 frontend/dist/
+
+# Vercel CLI
+.vercel/

@@ -91,3 +91,16 @@ class ProjectionResponse(BaseModel):
     initial_balance: Decimal
     balance_date: date | None
     points: list[ProjectionPoint]
+
+
+class LoginRequest(BaseModel):
+    password: str = Field(min_length=1, max_length=200)
+
+
+class LoginResponse(BaseModel):
+    token: str
+
+
+class AuthStatus(BaseModel):
+    required: bool = Field(description="Si la app pide contraseña")
+    authenticated: bool = Field(description="Si la petición lleva una sesión válida (o no hace falta)")

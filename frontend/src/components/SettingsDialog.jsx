@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Check, LoaderCircle } from 'lucide-react'
+import { Check, LoaderCircle, LogOut } from 'lucide-react'
 
 import { api } from '@/api/client'
 import { Button } from '@/components/ui/button'
@@ -7,6 +7,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
+import { useAuth } from '@/hooks/useAuth'
 import { useApiQuery, useFinanceData } from '@/hooks/useFinanceData'
 import { useTheme } from '@/hooks/useTheme'
 import { toISODate } from '@/lib/format'
@@ -119,14 +120,25 @@ function InitialBalanceSetting() {
   return <InitialBalanceForm settings={data} />
 }
 
-/** Modal de ajustes (engranaje del encabezado): tema y patrimonio inicial. */
+function SessionSetting() {
+  const { logout } = useAuth()
+  return (
+    <Button variant="outline" onClick={logout} className="justify-self-start">
+      <LogOut />
+      Cerrar sesión en este dispositivo
+    </Button>
+  )
+}
+
+/** Modal de ajustes (engranaje del encabezado): tema, patrimonio inicial y sesión. */
 export function SettingsDialog({ open, onOpenChange }) {
+  const { required: hasSession } = useAuth()
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="gap-6">
         <DialogHeader>
           <DialogTitle>Ajustes</DialogTitle>
-          <DialogDescription className="sr-only">Apariencia y patrimonio inicial</DialogDescription>
+          <DialogDescription className="sr-only">Apariencia, patrimonio inicial y sesión</DialogDescription>
         </DialogHeader>
 
         <Section title="Apariencia">
@@ -139,6 +151,12 @@ export function SettingsDialog({ open, onOpenChange }) {
         >
           <InitialBalanceSetting />
         </Section>
+
+        {hasSession && (
+          <Section title="Sesión">
+            <SessionSetting />
+          </Section>
+        )}
       </DialogContent>
     </Dialog>
   )
