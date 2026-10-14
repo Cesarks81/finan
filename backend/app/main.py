@@ -1,0 +1,219 @@
+"""API REST de finanzas personales: flujos (GFM, GVM, IFM, IVM) y proyección de patrimonio.
+
+Todas las rutas cuelgan de `/api`, igual en local que en Vercel (donde `/api/*` llega a
+esta app como función Python y el resto lo sirve el frontend estático).
+"""
+
+import os
+import time
+from datetime import date, timedelta
+from decimal import Decimal
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, FastAPI, Header, HTTPException, Query, Response, status
+from fastapi.exceptions import RequestValidationError
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import ValidationError
+from sqlalchemy import select, text
+from sqlalchemy.orm import Session
+
+from . import models, schemas
+from .auth import app_password, auth_required, check_password, is_authenticated, require_auth, session_token
+from .database import get_db
+from .projection import add_months, build_periods, project
+
+MAX_POINTS = {schemas.Granularity.D: 1100, schemas.Granularity.M: 600, schemas.Granularity.A: 100}
+
+DbSession = Annotated[Session, Depends(get_db)]
+
+
+API_PREFIX = "/api"
+
+app = FastAPI(
+    title="Finan API",
+    version="0.1.0",
+    docs_url=f"{API_PREFIX}/docs",
+    redoc_url=None,
+    openapi_url=f"{API_PREFIX}/openapi.json",
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    # 5173: `pnpm dev`; 4173: `pnpm preview` (build de producción con la PWA).
+    allow_origins=os.getenv(
+        "CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173,http://localhost:4173,http://127.0.0.1:4173"
+    ).split(","),
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+# Rutas abiertas (salud y sesión) y rutas de datos, que exigen sesión si hay contraseña.
+public = APIRouter(prefix=API_PREFIX)
+private = APIRouter(prefix=API_PREFIX, dependencies=[Depends(require_auth)])
+
+
+@public.get("/health", tags=["sistema"])
+def health(db: DbSession) -> dict[str, str]:
+    db.execute(text("SELECT 1"))
+    return {"status": "ok", "database": "ok"}
+
+
+# --- Sesión ----------------------------------------------------------------
+
+
+@public.get("/auth/status", response_model=schemas.AuthStatus, tags=["sesión"])
+def auth_status(authorization: Annotated[str | None, Header()] = None) -> schemas.AuthStatus:
+    return schemas.AuthStatus(required=auth_required(), authenticated=is_authenticated(authorization))
+
+
+@public.post("/auth/login", response_model=schemas.LoginResponse, tags=["sesión"])
+def login(payload: schemas.LoginRequest) -> schemas.LoginResponse:
+    if not auth_required():
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Esta instalación no usa contraseña")
+    if app_password() is None:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "Falta configurar APP_PASSWORD en el servidor")
+    if not check_password(payload.password):
+        time.sleep(1)  # Frena los intentos de adivinar la contraseña.
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Contraseña incorrecta")
+    return schemas.LoginResponse(token=session_token(payload.password))
+
+
+# --- Flujos ----------------------------------------------------------------
+
+
+def get_flow_or_404(db: Session, flow_id: int) -> models.Flow:
+    flow = db.get(models.Flow, flow_id)
+    if flow is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, f"Flujo {flow_id} no encontrado")
+    return flow
+
+
+@private.post("/flows", response_model=schemas.FlowRead, status_code=status.HTTP_201_CREATED, tags=["flujos"])
+def create_flow(payload: schemas.FlowCreate, db: DbSession) -> models.Flow:
+    flow = models.Flow(**payload.model_dump())
+    db.add(flow)
+    db.commit()
+    db.refresh(flow)
+    return flow
+
+
+@private.get("/flows", response_model=list[schemas.FlowRead], tags=["flujos"])
+def list_flows(
+    db: DbSession,
+    flow_type: Annotated[list[models.FlowType] | None, Query(description="Filtra por uno o varios tipos")] = None,
+) -> list[models.Flow]:
+    query = select(models.Flow).order_by(models.Flow.start_date.desc(), models.Flow.id.desc())
+    if flow_type:
+        query = query.where(models.Flow.flow_type.in_(flow_type))
+    return list(db.scalars(query))
+
+
+@private.get("/flows/{flow_id}", response_model=schemas.FlowRead, tags=["flujos"])
+def read_flow(flow_id: int, db: DbSession) -> models.Flow:
+    return get_flow_or_404(db, flow_id)
+
+
+@private.patch("/flows/{flow_id}", response_model=schemas.FlowRead, tags=["flujos"])
+def update_flow(flow_id: int, payload: schemas.FlowUpdate, db: DbSession) -> models.Flow:
+    flow = get_flow_or_404(db, flow_id)
+    current = schemas.FlowCreate.model_validate(flow, from_attributes=True).model_dump()
+    try:
+        # Se valida el resultado completo para respetar las reglas de cada tipo.
+        merged = schemas.FlowCreate.model_validate(current | payload.model_dump(exclude_unset=True))
+    except ValidationError as exc:
+        raise RequestValidationError(exc.errors(include_url=False)) from exc
+    for field, value in merged.model_dump().items():
+        setattr(flow, field, value)
+    db.commit()
+    db.refresh(flow)
+    return flow
+
+
+@private.delete("/flows/{flow_id}", status_code=status.HTTP_204_NO_CONTENT, tags=["flujos"])
+def delete_flow(flow_id: int, db: DbSession) -> Response:
+    db.delete(get_flow_or_404(db, flow_id))
+    db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+# --- Ajustes (patrimonio inicial) --------------------------------------------
+
+SETTINGS_ID = 1
+
+
+def load_settings(db: Session) -> models.Settings:
+    """Ajustes guardados o, si aún no existen, los valores por defecto (sin persistir)."""
+    return db.get(models.Settings, SETTINGS_ID) or models.Settings(
+        id=SETTINGS_ID, initial_balance=Decimal(0), balance_date=None
+    )
+
+
+@private.get("/settings", response_model=schemas.SettingsRead, tags=["ajustes"])
+def read_settings(db: DbSession) -> models.Settings:
+    return load_settings(db)
+
+
+@private.put("/settings", response_model=schemas.SettingsRead, tags=["ajustes"])
+def update_settings(payload: schemas.SettingsUpdate, db: DbSession) -> models.Settings:
+    settings = db.merge(models.Settings(id=SETTINGS_ID, **payload.model_dump()))
+    db.commit()
+    db.refresh(settings)
+    return settings
+
+
+# --- Proyección de patrimonio ------------------------------------------------
+
+
+def default_end(granularity: schemas.Granularity, start: date) -> date:
+    if granularity == schemas.Granularity.D:
+        return start + timedelta(days=30)
+    if granularity == schemas.Granularity.M:
+        return add_months(start, 11)
+    return date(start.year + 9, 12, 31)
+
+
+@private.get("/projection", response_model=schemas.ProjectionResponse, tags=["patrimonio"])
+def get_projection(
+    db: DbSession,
+    granularity: schemas.Granularity = schemas.Granularity.M,
+    start: Annotated[date | None, Query(description="Por defecto, hoy")] = None,
+    end: Annotated[date | None, Query(description="Por defecto: +30 días (D), +12 meses (M), +10 años (A)")] = None,
+    initial_balance: Annotated[
+        Decimal | None,
+        Query(max_digits=14, decimal_places=2, description="Sustituye al patrimonio inicial guardado en /settings"),
+    ] = None,
+    balance_date: Annotated[
+        date | None,
+        Query(description="Fecha de initial_balance (solo junto a él). Sin ella, es el saldo previo a todo flujo"),
+    ] = None,
+) -> schemas.ProjectionResponse:
+    start = start or date.today()
+    end = end or default_end(granularity, start)
+    if end < start:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "end no puede ser anterior a start")
+
+    periods = build_periods(granularity, start, end)
+    if len(periods) > MAX_POINTS[granularity]:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_CONTENT,
+            f"Rango demasiado amplio: máximo {MAX_POINTS[granularity]} puntos para la vista {granularity.value}",
+        )
+
+    if initial_balance is None:
+        settings = load_settings(db)
+        initial_balance, balance_date = settings.initial_balance, settings.balance_date
+
+    flows = db.scalars(select(models.Flow)).all()
+    return schemas.ProjectionResponse(
+        granularity=granularity,
+        start=periods[0][1],
+        end=periods[-1][2],
+        initial_balance=initial_balance,
+        balance_date=balance_date,
+        points=project(flows, periods, initial_balance, balance_date),
+    )
+
+
+app.include_router(public)
+app.include_router(private)

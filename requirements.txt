@@ -1,0 +1,2 @@
+# Dependencias de la función Python en Vercel (las mismas que el backend).
+-r backend/requirements.txt
