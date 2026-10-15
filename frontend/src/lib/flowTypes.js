@@ -43,6 +43,7 @@ export const FLOW_TYPES = {
 
 export const FLOW_ORDER = ['GFM', 'GVM', 'IFM', 'IVM']
 export const VARIABLE_TYPES = ['GVM', 'IVM']
+export const FIXED_TYPES = ['GFM', 'IFM']
 
 /** Resumen de la periodicidad de un flujo devuelto por la API. */
 export function describeSchedule(flow) {

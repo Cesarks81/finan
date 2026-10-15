@@ -25,6 +25,43 @@ import { cn } from '@/lib/utils'
 
 const axisTick = { fill: 'var(--muted-foreground)', fontSize: 12 }
 
+// El máximo visible queda hacia el 45 % de la altura, así la curva no se pega al borde
+// superior y queda aire limpio por encima.
+const PEAK_HEIGHT = 0.45
+
+/** Paso «bonito» (1, 2, 2,5 o 5 × 10ⁿ) para dividir `range` en unas `count` marcas. */
+function niceStep(range, count) {
+  const raw = range / count
+  const magnitude = 10 ** Math.floor(Math.log10(raw))
+  const normalized = raw / magnitude
+  const nice = normalized <= 1 ? 1 : normalized <= 2 ? 2 : normalized <= 2.5 ? 2.5 : normalized <= 5 ? 5 : 10
+  return nice * magnitude
+}
+
+/**
+ * Escala del eje Y para los puntos visibles: `domain` y marcas equidistantes con valores
+ * limpios. El máximo queda hacia el 40–45 % de la altura, con un pequeño margen por debajo
+ * (sin bajar de 0 si todo el patrimonio es positivo).
+ */
+function yScale(points) {
+  if (!points.length) return { domain: ['auto', 'auto'], ticks: undefined }
+  const values = points.map((p) => p.balance)
+  const lo = Math.min(...values)
+  const hi = Math.max(...values)
+  const span = hi - lo || Math.max(Math.abs(hi) * 0.1, 1)
+  const bottom = lo >= 0 ? Math.max(0, lo - span * 0.15) : lo - span * 0.15
+  const top = Math.max(bottom + (hi - bottom) / PEAK_HEIGHT, bottom + span)
+
+  const step = niceStep(top - bottom, 5)
+  const first = Math.floor(bottom / step) * step
+  let last = Math.ceil(top / step) * step
+  // Redondear las marcas puede subir el pico: si pasa de la mitad, un paso más de aire.
+  while ((hi - first) / (last - first) > 0.5) last += step
+  const ticks = []
+  for (let value = first; value <= last + step / 2; value += step) ticks.push(Math.round(value * 100) / 100)
+  return { domain: [first, last], ticks }
+}
+
 function ChartTooltip({ active, payload, granularity }) {
   if (!active || !payload?.length) return null
   const point = payload[0].payload
@@ -75,6 +112,7 @@ export function NetWorthChart({ className }) {
     [data],
   )
   const hasNegative = points.some((p) => p.balance < 0)
+  const scale = useMemo(() => yScale(points), [points])
 
   return (
     <Card
@@ -136,6 +174,8 @@ export function NetWorthChart({ className }) {
                   />
                   <YAxis
                     hide={!isDesktop}
+                    domain={scale.domain}
+                    ticks={scale.ticks}
                     tickFormatter={formatEURCompact}
                     tick={axisTick}
                     tickLine={false}
