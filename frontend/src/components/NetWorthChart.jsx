@@ -136,11 +136,14 @@ function toneOf(value) {
   return 'text-muted-foreground'
 }
 
-/** Línea discreta bajo el título con la tasa de ahorro y el crecimiento de la vista. */
-function ChartSummary({ stats }) {
+/**
+ * Línea discreta con la tasa de ahorro y el crecimiento de la vista: en móvil bajo el título;
+ * en PC arriba a la derecha, a la altura del título.
+ */
+function ChartSummary({ stats, className }) {
   const growthValue = stats.growth ?? stats.change
   return (
-    <CardDescription className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs">
+    <CardDescription className={cn('flex flex-wrap gap-x-3 gap-y-0.5 text-xs', className)}>
       <span title="Parte de lo ingresado que queda tras los gastos en esta vista: (ingresos − gastos) / ingresos">
         Ahorro medio{' '}
         <span className={cn('font-medium tabular-nums', toneOf(stats.savingsRate))}>
@@ -269,15 +272,21 @@ export function NetWorthChart({ className }) {
             )}
           />
         </CardTitle>
-        {stats && <ChartSummary stats={stats} />}
-        {splitLines && (
-          <CardAction className="flex gap-3 text-xs">
-            {SPLIT_SERIES.map((series) => (
-              <span key={series.key} className="text-muted-foreground flex items-center gap-1.5">
-                <span aria-hidden className="h-0.5 w-3 rounded-full" style={{ backgroundColor: series.color }} />
-                {series.name}
-              </span>
-            ))}
+        {stats && !isDesktop && <ChartSummary stats={stats} />}
+        {((stats && isDesktop) || splitLines) && (
+          // PC: el resumen a la altura del título y, debajo, la leyenda. Móvil: solo la leyenda.
+          <CardAction className="flex flex-col items-end gap-1.5">
+            {stats && isDesktop && <ChartSummary stats={stats} className="min-h-5 items-center justify-end" />}
+            {splitLines && (
+              <div className="flex gap-3 text-xs">
+                {SPLIT_SERIES.map((series) => (
+                  <span key={series.key} className="text-muted-foreground flex items-center gap-1.5">
+                    <span aria-hidden className="h-0.5 w-3 rounded-full" style={{ backgroundColor: series.color }} />
+                    {series.name}
+                  </span>
+                ))}
+              </div>
+            )}
           </CardAction>
         )}
       </CardHeader>
