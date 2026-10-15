@@ -36,6 +36,11 @@ Aplicación web progresiva (PWA) de finanzas personales minimalista orientada a 
 * En la gráfica de patrimonio (móvil y PC), línea horizontal discontinua azul en el importe del objetivo con la etiqueta «Meta 20K € · may 2028»; si queda por encima de la escala visible, solo la etiqueta arriba a la derecha con «↑».
 * **Así te afecta:** al crear o editar un flujo, con el formulario completo, el modal muestra cómo cambia *Disponible este mes* y el mes del objetivo (`goalImpact`: suma o resta a la proyección larga lo que aporta el flujo mes a mes, sin el flujo editado, respetando la fecha del patrimonio inicial como hace el backend). Lo que empeora va en rojo y lo que mejora en verde.
 
+### Revisión mensual
+* Una vez al mes se compara el saldo real de las cuentas con lo que prevé finan (el patrimonio de hoy). Toca si hay flujos y el patrimonio inicial no está fechado en el mes en curso (`reviewDone` en `lib/review.js`; fijarlo a mano en Ajustes también cuenta) y no se pospuso en este dispositivo («Este mes no», hasta el mes siguiente; `useMonthlyReview`).
+* Aviso (`ReviewReminder` en `MonthlyReview.jsx`): en móvil, una barra «Revisión de octubre · 2 min» entre la gráfica y los botones (también con el Historial abierto, para que la gráfica no cambie de tamaño); en PC, una tarjeta encima de la del objetivo con «Revisar ahora».
+* El modal pide el saldo real de hoy y muestra previsto, real y diferencia (verde si sobra, rojo si falta). Si falta y hay una revisión anterior, lo reparte por día desde ella («unos 6 € al día… Es tu fuga»). «Ajustar al saldo real» ancla el patrimonio inicial hoy (`PUT /settings`), restando los flujos de hoy (`anchorForToday`), porque el saldo real ya los incluye: el patrimonio de hoy pasa a ser el real y la proyección parte de ahí.
+
 ### Lógica de Visualización y Responsividad
 * **Vista PC:** encabezado con `finan` a la izquierda y, a la derecha, el valor del portfolio y el engranaje de ajustes. Debajo, dos columnas: a la izquierda la gráfica `EVOLUCIÓN PATRIMONIO` y el `Historial`; a la derecha, la pila de los 4 botones de flujo.
 * **Vista Móvil:** encabezado solo con el valor del portfolio, el botón del Historial arriba a la izquierda y el engranaje arriba a la derecha, a la misma altura. Gráfica a todo el ancho, sin tarjeta (estilo Trade Republic) y con ejes discretos: fechas pequeñas debajo (las de los extremos alineadas hacia dentro) e importes dentro de la gráfica a la izquierda, tenues y sobre líneas guía muy suaves, y debajo los 4 botones apilados. Pantalla fija sin scroll (`h-dvh`, `overscroll-behavior: none`): la gráfica ocupa el alto que dejan libre el encabezado y los botones, y tiene `touch-action: none` para que arrastrar el dedo solo mueva el indicador. Con el dedo, la información de un punto solo se ve mientras se toca (aparece al tocar, aunque no se mueva, y se va al levantarlo); con el ratón, al pasar por encima. La información se coloca justo encima de lo más alto de las líneas en el tramo que ocupa (`TooltipAnchor`), para no taparlas; en horizontal sigue al dedo o al ratón. Aparece directamente en su sitio con un fundido muy rápido (150 ms) creciendo desde abajo, sin deslizarse desde otra posición; una vez visible, sí se desliza al arrastrar. Mientras la línea se dibuja (al cargar, al cambiar de vista o de modo y cuando cambian los datos) la gráfica no responde al dedo ni al ratón, para no cortar la animación; se marca con `data-drawing` en el DOM (no con estado de React, que volvería a pintar y la cortaría) y se libera al acabar. Al tocarla no se dibuja el recuadro de foco que el navegador pondría alrededor de la gráfica o del área tocada (Recharts hace enfocables la gráfica y sus capas internas), ni se selecciona ni abre el menú de iOS al mantener el dedo (`index.css`).
@@ -76,11 +81,11 @@ Aplicación web progresiva (PWA) de finanzas personales minimalista orientada a 
     ├── src/
     │   ├── components/
     │   │   ├── ui/         # Componentes shadcn/ui (Button, Card, Checkbox, Dialog, Select, Table, ToggleGroup…)
-    │   │   └── *.jsx       # Gráfica (con selector D M A), botones y modal de flujo, Ajustes, Historial, disponible, objetivo (GoalCard), acceso
+    │   │   └── *.jsx       # Gráfica (con selector D M A), botones y modal de flujo, Ajustes, Historial, disponible, objetivo (GoalCard), revisión mensual, acceso
     │   ├── views/          # Dashboard principal (Layout PC vs. Mobile)
     │   ├── api/            # Cliente Fetch de la API (`/api` del mismo dominio; envía el token de sesión)
-    │   ├── hooks/          # useTheme, useAuth, useFinanceData (recarga tras cambios), useMediaQuery, usePersistentState
-    │   ├── lib/            # Formato (€, fechas), tipos de flujo, carga de las 3 vistas y la larga (projections.js), presupuesto (budget.js), objetivo (goal.js), cn()
+    │   ├── hooks/          # useTheme, useAuth, useFinanceData (recarga tras cambios), useMediaQuery, usePersistentState, useMonthlyReview
+    │   ├── lib/            # Formato (€, fechas), tipos de flujo, carga de las 3 vistas y la larga (projections.js), presupuesto (budget.js), objetivo (goal.js), revisión (review.js), cn()
     │   └── App.jsx
     ├── public/             # Favicon e iconos de la PWA (192, 512, maskable, apple-touch-icon)
     ├── vite.config.js      # Alias @/, Tailwind y PWA (vite-plugin-pwa: manifest + service worker)

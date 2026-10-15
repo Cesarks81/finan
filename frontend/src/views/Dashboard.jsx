@@ -6,11 +6,13 @@ import { FlowDialog } from '@/components/FlowDialog'
 import { GoalCard } from '@/components/GoalCard'
 import { HistoryTable } from '@/components/HistoryTable'
 import { MonthlyBudget } from '@/components/MonthlyBudget'
+import { ReviewDialog, ReviewReminder } from '@/components/MonthlyReview'
 import { NetWorthChart } from '@/components/NetWorthChart'
 import { SettingsDialog } from '@/components/SettingsDialog'
 import { Button } from '@/components/ui/button'
 import { useFinanceData } from '@/hooks/useFinanceData'
 import { useIsDesktop } from '@/hooks/useMediaQuery'
+import { useMonthlyReview } from '@/hooks/useMonthlyReview'
 import { formatEUR } from '@/lib/format'
 import { cn } from '@/lib/utils'
 
@@ -47,6 +49,9 @@ function PortfolioValue() {
 export function Dashboard() {
   const [dialog, setDialog] = useState({ open: false, flow: null, type: 'GVM', key: 0 })
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [review, setReview] = useState({ open: false, key: 0 })
+  const monthlyReview = useMonthlyReview()
+  const openReview = () => setReview((current) => ({ open: true, key: current.key + 1 }))
   // Solo en móvil: bajo la gráfica, los 4 botones o el Historial (en PC se ven siempre los dos).
   const [showHistory, setShowHistory] = useState(false)
   const isDesktop = useIsDesktop()
@@ -91,6 +96,8 @@ export function Dashboard() {
 
       <main className="flex min-h-0 flex-1 flex-col gap-4 md:grid md:flex-none md:grid-cols-[minmax(0,1fr)_15rem] md:grid-rows-[auto_auto] md:gap-6 lg:grid-cols-[minmax(0,1fr)_18rem]">
         <NetWorthChart className="min-h-0 flex-1 md:col-start-1 md:row-start-1 md:flex-none" />
+        {/* Móvil: el aviso de la revisión del mes, sobre los botones (o el Historial). */}
+        {!isDesktop && monthlyReview.pending && <ReviewReminder onOpen={openReview} />}
         {/* Móvil: el Historial ocupa exactamente el hueco de los botones (que siguen marcando el
             alto, invisibles) y se desplaza por dentro. En PC el envoltorio no existe (`contents`)
             y cada uno va a su celda de la rejilla. */}
@@ -111,9 +118,11 @@ export function Dashboard() {
             )}
           />
         </div>
-        {/* PC: la tarjeta del objetivo, en la columna de los botones, a la altura del Historial. */}
+        {/* PC: el aviso de la revisión del mes y la tarjeta del objetivo, en la columna de los
+            botones, a la altura del Historial. */}
         {isDesktop && (
           <div className="flex flex-col gap-3 md:col-start-2 md:row-start-2 md:self-start">
+            {monthlyReview.pending && <ReviewReminder card onOpen={openReview} />}
             <GoalCard onEdit={() => setSettingsOpen(true)} />
           </div>
         )}
@@ -127,6 +136,12 @@ export function Dashboard() {
         formKey={dialog.key}
       />
       <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
+      <ReviewDialog
+        open={review.open}
+        onOpenChange={(open) => setReview((current) => ({ ...current, open }))}
+        onSkip={monthlyReview.skip}
+        formKey={review.key}
+      />
     </div>
   )
 }
