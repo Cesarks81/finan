@@ -115,3 +115,8 @@
 .recharts-wrapper :focus {
   outline: none;
 }
+
+/* Mientras la línea de la gráfica se dibuja, no responde al dedo ni al ratón (NetWorthChart). */
+[data-drawing] .recharts-wrapper {
+  pointer-events: none;
+}
