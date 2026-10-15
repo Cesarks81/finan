@@ -12,6 +12,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { useFinanceData } from '@/hooks/useFinanceData'
 import { useTheme } from '@/hooks/useTheme'
 import { toISODate } from '@/lib/format'
+import { investmentOf, investmentValue } from '@/lib/investment'
 
 function Section({ title, description, children }) {
   return (
@@ -396,6 +397,133 @@ function GoalSetting() {
   return <GoalForm settings={data} />
 }
 
+/**
+ * Inversión: lo invertido hoy, la aportación mensual y la rentabilidad anual esperada. Al abrir,
+ * «Invertido hoy» ya trae lo que valdría hoy lo guardado (con lo que ha rendido y aportado), y al
+ * guardar se toma esa cifra como punto de partida con fecha de hoy.
+ */
+function InvestmentForm({ settings }) {
+  const { refresh } = useFinanceData()
+  const [today] = useState(() => toISODate(new Date()))
+  const current = investmentOf(settings)
+  const [form, setForm] = useState(() => ({
+    amount: current ? investmentValue(current, today).toFixed(2) : '',
+    monthly: current?.monthly ? String(current.monthly) : '',
+    rate: current ? String(Number(settings.invest_return)) : '',
+  }))
+  const [status, setStatus] = useState('idle') // idle | saving | saved
+  const [error, setError] = useState(null)
+  const edit = (field) => (event) => {
+    setForm((f) => ({ ...f, [field]: event.target.value }))
+    setStatus('idle')
+  }
+  const clean = (value) => String(value).trim().replace(',', '.')
+
+  async function save(changes) {
+    setStatus('saving')
+    setError(null)
+    try {
+      await api.patchSettings(changes)
+      refresh()
+      setStatus('saved')
+    } catch (err) {
+      setError(err.message)
+      setStatus('idle')
+    }
+  }
+
+  function handleSubmit(event) {
+    event.preventDefault()
+    save({
+      invest_amount: clean(form.amount),
+      invest_monthly: clean(form.monthly) || '0',
+      invest_return: clean(form.rate),
+      invest_date: today,
+    })
+  }
+
+  function handleRemove() {
+    setForm({ amount: '', monthly: '', rate: '' })
+    save({ invest_amount: null, invest_monthly: null, invest_return: null, invest_date: null })
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="grid gap-4">
+      <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-4">
+        <div className="grid gap-2">
+          <Label htmlFor="invest-amount">Invertido hoy (€)</Label>
+          <Input
+            id="invest-amount"
+            type="number"
+            inputMode="decimal"
+            min="0"
+            step="0.01"
+            value={form.amount}
+            onChange={edit('amount')}
+            required
+          />
+        </div>
+        <div className="grid gap-2">
+          <Label htmlFor="invest-monthly">Aportas al mes (€)</Label>
+          <Input
+            id="invest-monthly"
+            type="number"
+            inputMode="decimal"
+            min="0"
+            step="0.01"
+            value={form.monthly}
+            onChange={edit('monthly')}
+          />
+        </div>
+      </div>
+      <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-4">
+        <div className="grid gap-2">
+          <Label htmlFor="invest-return">Rentabilidad anual (%)</Label>
+          <Input
+            id="invest-return"
+            type="number"
+            inputMode="decimal"
+            min="-50"
+            max="50"
+            step="0.1"
+            value={form.rate}
+            onChange={edit('rate')}
+            required
+          />
+        </div>
+      </div>
+      {error && (
+        <p role="alert" className="text-destructive text-sm">
+          {error}
+        </p>
+      )}
+      <div className="flex items-center justify-end gap-3">
+        {status === 'saved' && (
+          <p role="status" className="text-income flex items-center gap-1 text-sm">
+            <Check className="size-4" /> Guardado
+          </p>
+        )}
+        {current && (
+          <Button type="button" variant="ghost" onClick={handleRemove} disabled={status === 'saving'}>
+            Quitar
+          </Button>
+        )}
+        <Button type="submit" disabled={status === 'saving'}>
+          {status === 'saving' && <LoaderCircle className="animate-spin" />}
+          Guardar
+        </Button>
+      </div>
+    </form>
+  )
+}
+
+function InvestmentSetting() {
+  const { data, error } = useFinanceData().settings
+  if (error) return <p className="text-destructive text-sm">{error.message}</p>
+  if (!data) return <LoaderCircle className="text-muted-foreground mx-auto size-5 animate-spin" />
+  return <InvestmentForm settings={data} />
+}
+
 function SessionSetting() {
   const { logout } = useAuth()
   return (
@@ -430,6 +558,13 @@ export function SettingsDialog({ open, onOpenChange }) {
           description="El patrimonio al que quieres llegar (un colchón, la entrada de un piso…). finan lo marca en la gráfica con una línea azul, te dice cuándo llegas y, al añadir un gasto o un ingreso, cuánto lo adelanta o lo retrasa."
         >
           <GoalSetting />
+        </Section>
+
+        <Section
+          title="Inversión"
+          description="Qué parte de tu patrimonio está en fondos, acciones o similares (ya cuenta dentro de tu patrimonio: aquí solo dices cuánto está invertido). Solo esa parte crece con la rentabilidad; el resto, no. Lo que aportas cada mes sale de lo que ahorras (no es un gasto) y también rinde. La gráfica sigue mostrando el patrimonio total."
+        >
+          <InvestmentSetting />
         </Section>
 
         <Section

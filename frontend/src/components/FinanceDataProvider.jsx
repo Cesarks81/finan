@@ -4,6 +4,7 @@ import { api } from '@/api/client'
 import { FinanceDataContext, useApiQuery } from '@/hooks/useFinanceData'
 import { usePersistentState } from '@/hooks/usePersistentState'
 import { inRealTerms } from '@/lib/inflation'
+import { investmentOf, withInvestment } from '@/lib/investment'
 import { fetchAllProjections } from '@/lib/projections'
 
 /**
@@ -27,12 +28,18 @@ export function FinanceDataProvider({ children }) {
   const [realTerms, setRealTerms] = usePersistentState('finan-chart-real', false)
   const [inflation, setInflation] = usePersistentState('finan-chart-inflation', 2)
   const nominal = useApiQuery(() => fetchAllProjections({ calendar }), [version, calendar])
-  const projections = useMemo(
-    () => (realTerms && nominal.data ? { ...nominal, data: inRealTerms(nominal.data, inflation / 100) } : nominal),
-    [nominal, realTerms, inflation],
-  )
   const flows = useApiQuery(api.listFlows, [version])
   const settings = useApiQuery(api.getSettings, [version])
+  // Sobre lo que da la API: la rentabilidad de la inversión (de los ajustes) y, con «Euros de
+  // hoy», la inflación. Hasta tener los ajustes no se da ninguna proyección, para no dibujar
+  // primero la línea sin la inversión.
+  const projections = useMemo(() => {
+    if (!nominal.data) return nominal
+    if (!settings.data) return settings.error ? nominal : { ...nominal, data: null, loading: true }
+    let data = withInvestment(nominal.data, investmentOf(settings.data), settings.data.balance_date)
+    if (realTerms) data = inRealTerms(data, inflation / 100)
+    return { ...nominal, data }
+  }, [nominal, settings.data, settings.error, realTerms, inflation])
 
   const value = useMemo(
     () => ({
