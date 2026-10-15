@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useState } from 'react'
+import { useCallback, useEffect, useId, useMemo, useState } from 'react'
 import { LoaderCircle } from 'lucide-react'
 import {
   Area,
@@ -252,10 +252,15 @@ function TooltipAnchor({ points, splitLines, onChange }) {
 }
 
 function ChartTooltip({ active, payload, granularity, splitLines, lifted }) {
-  if (!active || !payload?.length) return null
+  // Hasta saber a qué altura va (un fotograma) no se dibuja, para no aparecer en otro sitio.
+  if (!active || !payload?.length || !lifted) return null
   const point = payload[0].payload
   // Anclado al punto más alto: sube toda su altura para quedar justo encima, sin tapar las líneas.
-  const box = cn('bg-popover text-popover-foreground grid gap-1.5 rounded-lg border px-3 py-2 text-xs shadow-md', lifted && '-translate-y-full')
+  // Al aparecer, un fundido muy rápido creciendo desde abajo (no se desliza desde otra posición).
+  const box = cn(
+    'bg-popover text-popover-foreground grid gap-1.5 rounded-lg border px-3 py-2 text-xs shadow-md',
+    '-translate-y-full origin-bottom animate-in fade-in-0 zoom-in-95 duration-150',
+  )
   if (splitLines) {
     return (
       <div className={cn(box, 'min-w-52')}>
@@ -300,6 +305,17 @@ export function NetWorthChart({ className }) {
   const isDesktop = useIsDesktop()
   const [granularity, setGranularity] = useState('M')
   const [tooltipTop, setTooltipTop] = useState(null)
+  // La información solo se desliza (sigue al dedo o al ratón con animación) una vez visible: al
+  // aparecer se coloca directamente en su sitio, en vez de venir desde la esquina o desde donde
+  // estuvo la vez anterior.
+  const [tooltipGlides, setTooltipGlides] = useState(false)
+  const placeTooltip = useCallback((top) => {
+    setTooltipTop(top)
+    if (top === null) setTooltipGlides(false)
+    // Recharts tarda un par de fotogramas en medir la caja y colocarla: el deslizamiento se activa
+    // después (antes de que termine de aparecer, así que no se nota).
+    else setTimeout(() => setTooltipGlides(true), 100)
+  }, [])
   // Las tres vistas ya están en memoria: cambiar de una a otra no hace peticiones.
   const { projections, chart } = useFinanceData()
   const { splitLines, calendar } = chart
@@ -423,12 +439,13 @@ export function NetWorthChart({ className }) {
                     axisLine={false}
                     width={isDesktop ? 'auto' : 72}
                   />
-                  <TooltipAnchor points={points} splitLines={splitLines} onChange={setTooltipTop} />
+                  <TooltipAnchor points={points} splitLines={splitLines} onChange={placeTooltip} />
                   <Tooltip
                     // Encima del punto más alto del periodo (la información sube su propia altura);
                     // en horizontal sigue al dedo o al ratón. La escala deja libre la mitad de arriba.
                     position={tooltipTop === null ? undefined : { y: tooltipTop - TOOLTIP_GAP }}
                     allowEscapeViewBox={{ x: false, y: true }}
+                    isAnimationActive={tooltipGlides}
                     animationDuration={150}
                     content={<ChartTooltip granularity={granularity} splitLines={splitLines} lifted={tooltipTop !== null} />}
                     cursor={{ stroke: 'var(--muted-foreground)', strokeDasharray: '3 3' }}
