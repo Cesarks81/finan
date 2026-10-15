@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Settings } from 'lucide-react'
+import { ChartSpline, History, Settings } from 'lucide-react'
 
 import { FlowButtons } from '@/components/FlowButtons'
 import { FlowDialog } from '@/components/FlowDialog'
@@ -38,11 +38,14 @@ function PortfolioValue() {
  * - PC: encabezado con `finan` a la izquierda y el patrimonio + ajustes a la derecha; debajo,
  *   dos columnas: gráfica e History a la izquierda, los 4 botones de flujo a la derecha.
  * - Móvil: encabezado solo con el patrimonio (y ajustes), gráfica a todo el ancho y los
- *   4 botones apilados debajo. History no se muestra.
+ *   4 botones apilados debajo. El botón de la izquierda del encabezado cambia esa pantalla
+ *   por la del Historial, y vuelta.
  */
 export function Dashboard() {
   const [dialog, setDialog] = useState({ open: false, flow: null, type: 'GVM', key: 0 })
   const [settingsOpen, setSettingsOpen] = useState(false)
+  // Solo en móvil: pantalla de la gráfica o del Historial (en PC se ven siempre las dos).
+  const [showHistory, setShowHistory] = useState(false)
 
   const openDialog = (changes) => setDialog((current) => ({ ...current, ...changes, open: true, key: current.key + 1 }))
   const openCreate = (type) => openDialog({ flow: null, type })
@@ -52,6 +55,16 @@ export function Dashboard() {
     // Móvil: pantalla fija del alto de la ventana, sin scroll; la gráfica ocupa el espacio libre.
     <div className="mx-auto flex h-dvh w-full max-w-6xl flex-col gap-4 overflow-hidden px-4 pt-[max(1.25rem,env(safe-area-inset-top))] pb-[max(1.25rem,env(safe-area-inset-bottom))] md:h-auto md:min-h-dvh md:gap-8 md:overflow-visible md:px-6 md:pt-8 md:pb-8">
       <header className="relative flex min-h-10 items-center justify-center px-12 md:justify-between md:px-0">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => setShowHistory((current) => !current)}
+          aria-label={showHistory ? 'Ver gráfica' : 'Ver historial'}
+          title={showHistory ? 'Ver gráfica' : 'Ver historial'}
+          className="absolute top-1/2 left-0 -translate-y-1/2 md:hidden"
+        >
+          {showHistory ? <ChartSpline className="size-5" /> : <History className="size-5" />}
+        </Button>
         <h1 className="sr-only text-2xl font-bold tracking-tight md:not-sr-only">finan</h1>
         <div className="flex items-center gap-4">
           <PortfolioValue />
@@ -69,9 +82,14 @@ export function Dashboard() {
       </header>
 
       <main className="flex min-h-0 flex-1 flex-col gap-4 md:grid md:flex-none md:grid-cols-[minmax(0,1fr)_15rem] md:grid-rows-[auto_auto] md:gap-6 lg:grid-cols-[minmax(0,1fr)_18rem]">
-        <NetWorthChart className="min-h-0 flex-1 md:col-start-1 md:row-start-1 md:flex-none" />
-        <FlowButtons onSelect={openCreate} className="md:col-start-2 md:row-start-1" />
-        <HistoryTable onEdit={openEdit} className="hidden md:col-start-1 md:row-start-2 md:flex" />
+        <NetWorthChart
+          className={cn('min-h-0 flex-1 md:col-start-1 md:row-start-1 md:flex md:flex-none', showHistory && 'hidden')}
+        />
+        <FlowButtons onSelect={openCreate} className={cn('md:col-start-2 md:row-start-1 md:flex', showHistory && 'hidden')} />
+        <HistoryTable
+          onEdit={openEdit}
+          className={cn('min-h-0 flex-1 md:col-start-1 md:row-start-2 md:flex md:flex-none', !showHistory && 'hidden')}
+        />
       </main>
 
       <FlowDialog

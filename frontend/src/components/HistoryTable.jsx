@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { LoaderCircle, Pencil, Trash2 } from 'lucide-react'
+import { ChevronRight, LoaderCircle, Pencil, Trash2 } from 'lucide-react'
 
 import { api } from '@/api/client'
 import {
@@ -18,6 +18,7 @@ import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@/componen
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { useFinanceData } from '@/hooks/useFinanceData'
+import { useIsDesktop } from '@/hooks/useMediaQuery'
 import { describeSchedule, FIXED_TYPES, FLOW_TYPES, VARIABLE_TYPES } from '@/lib/flowTypes'
 import { formatDate, formatEUR } from '@/lib/format'
 import { cn } from '@/lib/utils'
@@ -44,8 +45,68 @@ const FILTERS = [
   },
 ]
 
-/** Historial de los flujos: variables, fijos y los ya terminados. Solo se muestra en PC. */
+function TypeBadge({ flow }) {
+  const { income } = FLOW_TYPES[flow.flow_type]
+  return (
+    <Badge variant="outline" className={income ? 'border-income/40 text-income' : 'border-expense/40 text-expense'}>
+      {flow.flow_type}
+    </Badge>
+  )
+}
+
+function ScheduleBadge({ schedule }) {
+  return (
+    <Badge variant="outline" className="text-muted-foreground font-normal" title={schedule.hint}>
+      {schedule.label}
+    </Badge>
+  )
+}
+
+function Amount({ flow, className }) {
+  const { income } = FLOW_TYPES[flow.flow_type]
+  return (
+    <span className={cn('tabular-nums', income ? 'text-income' : 'text-expense', className)}>
+      {income ? '+' : '−'}
+      {formatEUR(flow.amount)}
+    </span>
+  )
+}
+
+/**
+ * Historial en móvil: una lista en vez de la tabla. Cada fila abre el flujo para editarlo
+ * (el modal de edición también permite eliminarlo).
+ */
+function MobileHistoryList({ rows, onEdit }) {
+  return (
+    <ul className="divide-y">
+      {rows.map(({ flow, schedule }) => (
+        <li key={flow.id}>
+          <button type="button" onClick={() => onEdit(flow)} className="flex w-full items-center gap-3 py-3 text-left">
+            <span className="grid min-w-0 flex-1 gap-1.5">
+              <span className="flex min-w-0 items-center gap-2">
+                <TypeBadge flow={flow} />
+                <span className="truncate text-sm font-medium">{flow.concept}</span>
+              </span>
+              <span className="text-muted-foreground flex items-center gap-2 text-xs">
+                {formatDate(flow.start_date)}
+                <ScheduleBadge schedule={schedule} />
+              </span>
+            </span>
+            <Amount flow={flow} className="shrink-0 text-sm font-medium" />
+            <ChevronRight aria-hidden className="text-muted-foreground size-4 shrink-0" />
+          </button>
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+/**
+ * Historial de los flujos: variables, fijos y los ya terminados. En PC va debajo de la gráfica,
+ * como tabla; en móvil ocupa su propia pantalla (botón del encabezado), como lista.
+ */
 export function HistoryTable({ onEdit, className }) {
+  const isDesktop = useIsDesktop()
   const { refresh, flows } = useFinanceData()
   const { data: allFlows, error, loading } = flows
   const [filterValue, setFilterValue] = useState('variable')
@@ -65,8 +126,15 @@ export function HistoryTable({ onEdit, className }) {
   }
 
   return (
-    <Card className={cn('gap-4', className)}>
-      <CardHeader>
+    <Card
+      className={cn(
+        // Móvil: sin tarjeta, como la gráfica, y con la lista desplazable en el alto disponible.
+        '-mx-4 gap-3 rounded-none border-0 bg-transparent py-0 shadow-none',
+        'md:mx-0 md:gap-4 md:rounded-xl md:border md:bg-card md:py-6 md:shadow-sm',
+        className,
+      )}
+    >
+      <CardHeader className="px-4 md:px-6">
         <CardTitle className="flex items-center gap-2 text-sm tracking-wide uppercase">
           Historial
           {loading && <LoaderCircle className="text-muted-foreground size-3.5 animate-spin opacity-60" aria-label="Cargando" />}
@@ -88,7 +156,7 @@ export function HistoryTable({ onEdit, className }) {
           </ToggleGroup>
         </CardAction>
       </CardHeader>
-      <CardContent>
+      <CardContent className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 md:overflow-visible md:px-6">
         {(error || deleteError) && (
           <p role="alert" className="text-destructive mb-3 text-sm">
             {deleteError ?? error.message}
@@ -99,7 +167,10 @@ export function HistoryTable({ onEdit, className }) {
             {filter.empty}
           </p>
         ) : (
-          rows && (
+          rows &&
+          (!isDesktop ? (
+            <MobileHistoryList rows={rows} onEdit={onEdit} />
+          ) : (
             <Table>
               <TableHeader>
                 <TableRow>
@@ -115,31 +186,20 @@ export function HistoryTable({ onEdit, className }) {
               </TableHeader>
               <TableBody>
                 {rows.map(({ flow, schedule }) => {
-                  const income = FLOW_TYPES[flow.flow_type].income
                   return (
                     <TableRow key={flow.id}>
                       <TableCell className="text-muted-foreground">{formatDate(flow.start_date)}</TableCell>
                       <TableCell>
-                        <Badge
-                          variant="outline"
-                          className={income ? 'border-income/40 text-income' : 'border-expense/40 text-expense'}
-                        >
-                          {flow.flow_type}
-                        </Badge>
+                        <TypeBadge flow={flow} />
                       </TableCell>
                       <TableCell className="max-w-0 truncate font-medium" title={flow.concept}>
                         {flow.concept}
                       </TableCell>
-                      <TableCell title={schedule.hint}>
-                        <Badge variant="outline" className="text-muted-foreground font-normal">
-                          {schedule.label}
-                        </Badge>
+                      <TableCell>
+                        <ScheduleBadge schedule={schedule} />
                       </TableCell>
-                      <TableCell
-                        className={cn('text-right tabular-nums', income ? 'text-income' : 'text-expense')}
-                      >
-                        {income ? '+' : '−'}
-                        {formatEUR(flow.amount)}
+                      <TableCell className="text-right">
+                        <Amount flow={flow} />
                       </TableCell>
                       <TableCell>
                         <div className="flex justify-end gap-1">
@@ -162,7 +222,7 @@ export function HistoryTable({ onEdit, className }) {
                 })}
               </TableBody>
             </Table>
-          )
+          ))
         )}
       </CardContent>
 
