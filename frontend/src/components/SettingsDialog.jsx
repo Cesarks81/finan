@@ -117,7 +117,6 @@ function InitialBalanceForm({ settings }) {
             step="0.01"
             value={amount}
             onChange={edit(setAmount)}
-            placeholder="0,00"
             required
           />
         </div>
