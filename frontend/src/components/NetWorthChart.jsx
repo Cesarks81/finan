@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useMemo, useState } from 'react'
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { LoaderCircle } from 'lucide-react'
 import {
   Area,
@@ -309,13 +309,24 @@ export function NetWorthChart({ className }) {
   // aparecer se coloca directamente en su sitio, en vez de venir desde la esquina o desde donde
   // estuvo la vez anterior.
   const [tooltipGlides, setTooltipGlides] = useState(false)
+  const tooltipShown = useRef(false)
+  const glideTimer = useRef(null)
   const placeTooltip = useCallback((top) => {
     setTooltipTop(top)
-    if (top === null) setTooltipGlides(false)
-    // Recharts tarda un par de fotogramas en medir la caja y colocarla: el deslizamiento se activa
-    // después (antes de que termine de aparecer, así que no se nota).
-    else setTimeout(() => setTooltipGlides(true), 100)
+    if (top === null) {
+      // Al ocultarse se cancela el deslizamiento pendiente: tras un toque muy corto llegaba tarde
+      // y la siguiente vez la información volvía a venir deslizándose desde la anterior.
+      tooltipShown.current = false
+      clearTimeout(glideTimer.current)
+      setTooltipGlides(false)
+    } else if (!tooltipShown.current) {
+      // Recharts tarda un par de fotogramas en medir la caja y colocarla: el deslizamiento se
+      // activa después (antes de que termine de aparecer, así que no se nota).
+      tooltipShown.current = true
+      glideTimer.current = setTimeout(() => setTooltipGlides(true), 100)
+    }
   }, [])
+  useEffect(() => () => clearTimeout(glideTimer.current), [])
   // Las tres vistas ya están en memoria: cambiar de una a otra no hace peticiones.
   const { projections, chart } = useFinanceData()
   const { splitLines, calendar } = chart
