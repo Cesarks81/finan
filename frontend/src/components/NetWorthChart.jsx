@@ -67,6 +67,25 @@ const SPLIT_SERIES = [
   { key: 'expenseTotal', name: 'Gastos', color: 'var(--expense)' },
 ]
 
+// Degradado bajo cada línea, el mismo de la gráfica de patrimonio.
+const GRADIENTS = [{ key: 'balance', color: 'var(--chart-1)' }, ...SPLIT_SERIES]
+
+// Capa por defecto de las áreas en Recharts; la línea de delante va una por encima.
+const AREA_Z_INDEX = 100
+
+/**
+ * Capa de cada una de las dos líneas: la que llega más alto va detrás y la otra delante, para
+ * que el degradado de la de arriba no tape a la de abajo y siempre se vean las dos.
+ */
+function splitLayers(points) {
+  const peak = (key) => Math.max(0, ...points.map((p) => p[key]))
+  const incomeOnTop = peak('incomeTotal') >= peak('expenseTotal')
+  return {
+    incomeTotal: AREA_Z_INDEX + (incomeOnTop ? 0 : 1),
+    expenseTotal: AREA_Z_INDEX + (incomeOnTop ? 1 : 0),
+  }
+}
+
 /** Puntos de /projection como números, con los ingresos y gastos acumulados desde el primero. */
 function toChartPoints(apiPoints) {
   // Acumulados en céntimos para no arrastrar errores de coma flotante.
@@ -163,6 +182,7 @@ export function NetWorthChart({ splitLines = false, className }) {
   const data = projections.data?.[granularity]
 
   const points = useMemo(() => toChartPoints(data?.points ?? []), [data])
+  const layers = useMemo(() => splitLayers(points), [points])
   const hasNegative = !splitLines && points.some((p) => p.balance < 0)
   const scale = useMemo(
     () =>
@@ -222,10 +242,12 @@ export function NetWorthChart({ splitLines = false, className }) {
                   margin={isDesktop ? { top: 16, right: 12, left: 4, bottom: 0 } : { top: 16, right: 0, left: 0, bottom: 0 }}
                 >
                   <defs>
-                    <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="var(--chart-1)" stopOpacity={0.35} />
-                      <stop offset="95%" stopColor="var(--chart-1)" stopOpacity={0} />
-                    </linearGradient>
+                    {GRADIENTS.map(({ key, color }) => (
+                      <linearGradient key={key} id={`${gradientId}-${key}`} x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor={color} stopOpacity={0.35} />
+                        <stop offset="95%" stopColor={color} stopOpacity={0} />
+                      </linearGradient>
+                    ))}
                   </defs>
                   {isDesktop && <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="var(--border)" />}
                   <XAxis
@@ -263,12 +285,13 @@ export function NetWorthChart({ splitLines = false, className }) {
                     SPLIT_SERIES.map((series) => (
                       <Area
                         key={series.key}
+                        zIndex={layers[series.key]}
                         type="monotone"
                         dataKey={series.key}
                         name={series.name}
                         stroke={series.color}
                         strokeWidth={2}
-                        fill="none"
+                        fill={`url(#${gradientId}-${series.key})`}
                         activeDot={{ r: 4 }}
                       />
                     ))
@@ -279,7 +302,7 @@ export function NetWorthChart({ splitLines = false, className }) {
                       name="Patrimonio"
                       stroke="var(--chart-1)"
                       strokeWidth={2}
-                      fill={`url(#${gradientId})`}
+                      fill={`url(#${gradientId}-balance)`}
                       activeDot={{ r: 4 }}
                     />
                   )}
