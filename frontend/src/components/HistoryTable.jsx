@@ -17,7 +17,7 @@ import { Button, buttonVariants } from '@/components/ui/button'
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { useApiQuery, useFinanceData } from '@/hooks/useFinanceData'
+import { useFinanceData } from '@/hooks/useFinanceData'
 import { describeSchedule, FIXED_TYPES, FLOW_TYPES, VARIABLE_TYPES } from '@/lib/flowTypes'
 import { formatDate, formatEUR } from '@/lib/format'
 import { cn } from '@/lib/utils'
@@ -46,8 +46,8 @@ const FILTERS = [
 
 /** Historial de los flujos: variables, fijos y los ya terminados. Solo se muestra en PC. */
 export function HistoryTable({ onEdit, className }) {
-  const { version, refresh } = useFinanceData()
-  const { data: allFlows, error, loading } = useApiQuery(() => api.listFlows(), [version])
+  const { refresh, flows } = useFinanceData()
+  const { data: allFlows, error, loading } = flows
   const [filterValue, setFilterValue] = useState('variable')
   const filter = FILTERS.find((f) => f.value === filterValue)
   const rows = allFlows?.map((flow) => ({ flow, schedule: describeSchedule(flow) })).filter(filter.matches)
