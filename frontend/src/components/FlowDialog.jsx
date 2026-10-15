@@ -141,21 +141,24 @@ function FlowForm({ flow, defaultType, onDone }) {
       </DialogHeader>
 
       <div className="grid gap-4">
-        <Field label="Tipo" htmlFor="flow-type">
-          <Select value={form.flow_type} onValueChange={set('flow_type')}>
-            <SelectTrigger id="flow-type">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {FLOW_ORDER.map((code) => (
-                <SelectItem key={code} value={code}>
-                  <span className="font-semibold">{code}</span>
-                  <span className="text-muted-foreground">{FLOW_TYPES[code].label}</span>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </Field>
+        {/* Al añadir, el tipo lo fija el botón pulsado (y lo dice el título); al editar se puede cambiar. */}
+        {flow && (
+          <Field label="Tipo" htmlFor="flow-type">
+            <Select value={form.flow_type} onValueChange={set('flow_type')}>
+              <SelectTrigger id="flow-type">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {FLOW_ORDER.map((code) => (
+                  <SelectItem key={code} value={code}>
+                    <span className="font-semibold">{code}</span>
+                    <span className="text-muted-foreground">{FLOW_TYPES[code].label}</span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </Field>
+        )}
 
         <Field label="Concepto" htmlFor="flow-concept">
           <Input
