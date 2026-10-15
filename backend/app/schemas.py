@@ -19,18 +19,16 @@ class FlowBase(BaseModel):
     amount: Amount = Field(description="Importe en euros, siempre positivo")
     start_date: date = Field(description="Fecha del movimiento o de su primera ocurrencia")
     end_date: date | None = Field(default=None, description="Última fecha (inclusive) de un flujo mensual")
-    duration_months: int | None = Field(default=None, ge=1, le=600, description="Solo IVM temporal")
+    duration_months: int | None = Field(default=None, ge=1, le=600, description="Solo GVM / IVM temporal")
 
     @model_validator(mode="after")
     def check_type_rules(self) -> "FlowBase":
         if self.end_date is not None and self.end_date < self.start_date:
             raise ValueError("end_date no puede ser anterior a start_date")
-        if self.flow_type == FlowType.GVM and (self.end_date or self.duration_months):
-            raise ValueError("Un GVM es puntual: no admite end_date ni duration_months")
-        if self.flow_type in (FlowType.GFM, FlowType.IFM) and self.duration_months:
+        if self.flow_type.is_fixed and self.duration_months:
             raise ValueError("Los flujos fijos usan end_date (opcional), no duration_months")
-        if self.flow_type == FlowType.IVM and self.end_date and self.duration_months:
-            raise ValueError("Un IVM temporal admite end_date o duration_months, no ambos")
+        if self.end_date and self.duration_months:
+            raise ValueError("Un flujo variable temporal admite end_date o duration_months, no ambos")
         return self
 
 

@@ -16,7 +16,7 @@ export const FLOW_TYPES = {
     code: 'GVM',
     name: 'Gasto Variable Mensual',
     label: 'Gasto variable',
-    description: 'Compras puntuales o caprichos no planificados.',
+    description: 'Compras puntuales o caprichos no planificados, también a plazos (financiar una consola…).',
     placeholder: 'Auriculares',
     income: false,
     icon: ShoppingBag,
