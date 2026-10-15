@@ -28,11 +28,12 @@ Aplicación web progresiva (PWA) de finanzas personales minimalista orientada a 
 * Es el patrimonio **al empezar** esa fecha: los flujos desde ese día se suman o restan a partir de él y los anteriores reconstruyen la curva hacia atrás. Sin fecha, es el saldo previo a cualquier flujo.
 
 ### Lógica de Visualización y Responsividad
-* **Vista PC:** encabezado con `finan` a la izquierda y, a la derecha, el valor del portfolio y el engranaje de ajustes. Debajo, dos columnas: a la izquierda la gráfica `EVOLUCIÓN PATRIMONIO` y `HISTORY`; a la derecha, la pila de los 4 botones de flujo.
+* **Vista PC:** encabezado con `finan` a la izquierda y, a la derecha, el valor del portfolio y el engranaje de ajustes. Debajo, dos columnas: a la izquierda la gráfica `EVOLUCIÓN PATRIMONIO` y el `Historial`; a la derecha, la pila de los 4 botones de flujo.
 * **Vista Móvil:** encabezado solo con el valor del portfolio (y el engranaje arriba a la derecha). Gráfica a todo el ancho, sin tarjeta ni ejes (estilo Trade Republic), y debajo los 4 botones apilados. Pantalla fija sin scroll (`h-dvh`, `overscroll-behavior: none`): la gráfica ocupa el alto que dejan libre el encabezado y los botones, y tiene `touch-action: none` para que arrastrar el dedo solo mueva el indicador.
 * **Selector `D M A`:** integrado dentro de la gráfica, en la esquina inferior derecha. Cambia la resolución temporal (Días, Meses, Años); cada cambio repite la animación de la línea dibujándose. En D (−15/+30 días) y M (−6/+12 meses) la línea «Hoy» cae a 1/3 del ancho, en el mismo sitio; en A (−2/+8 años) queda más a la izquierda. Las tres vistas se piden juntas al cargar (`lib/projections.js`) y quedan en caché en `FinanceDataProvider`: cambiar de vista no hace peticiones. Solo se vuelven a pedir tras un cambio de datos (`refresh()`), mostrando las anteriores mientras llegan. El patrimonio del encabezado sale de la vista de días.
 * **Botones de flujo:** orden fijo GFM, GVM, IFM, IVM, con icono de arrastre a la izquierda. Son el único punto para añadir flujos (no hay botón `+` global).
-* **Sección History (Histórico):** **Exclusiva para la vista de PC** (ubicada debajo de la gráfica). Lista y detalla el historial de movimientos **variables** (gastos e ingresos temporales/puntuales).
+* **Escala de la gráfica:** el eje Y se calcula a partir de los datos visibles (`yScale` en `NetWorthChart.jsx`): el máximo queda hacia el 40–50 % de la altura para dejar aire por encima, sin bajar de 0 si todo es positivo, y con marcas equidistantes de valores limpios (1, 2, 2,5 o 5 × 10ⁿ).
+* **Sección Historial:** **Exclusiva para la vista de PC** (ubicada debajo de la gráfica). Lista **todos** los flujos con un filtro *Todos / Variables / Fijos*; los recurrentes muestran el importe «/mes». Cada fila se puede editar o eliminar, y el modal de edición incluye también «Eliminar» (con confirmación), así que cualquier flujo, fijo o variable, se puede modificar, terminar con una fecha de fin o borrar; la proyección se recalcula al momento.
 * **Ajustes (engranaje):** modal con el interruptor de Modo Oscuro/Claro, el patrimonio inicial y, si hay contraseña, «Cerrar sesión en este dispositivo».
 
 ### Despliegue y Acceso
@@ -63,7 +64,7 @@ Aplicación web progresiva (PWA) de finanzas personales minimalista orientada a 
     ├── src/
     │   ├── components/
     │   │   ├── ui/         # Componentes shadcn/ui (Button, Card, Dialog, Select, Table, ToggleGroup…)
-    │   │   └── *.jsx       # Gráfica (con selector D M A), botones y modal de flujo, Ajustes, History, acceso
+    │   │   └── *.jsx       # Gráfica (con selector D M A), botones y modal de flujo, Ajustes, Historial, acceso
     │   ├── views/          # Dashboard principal (Layout PC vs. Mobile)
     │   ├── api/            # Cliente Fetch de la API (`/api` del mismo dominio; envía el token de sesión)
     │   ├── hooks/          # useTheme, useAuth, useFinanceData (recarga tras cambios), useMediaQuery

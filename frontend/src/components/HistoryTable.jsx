@@ -15,16 +15,26 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { useApiQuery, useFinanceData } from '@/hooks/useFinanceData'
-import { describeSchedule, FLOW_TYPES, VARIABLE_TYPES } from '@/lib/flowTypes'
+import { describeSchedule, FIXED_TYPES, FLOW_TYPES, VARIABLE_TYPES } from '@/lib/flowTypes'
 import { formatDate, formatEUR } from '@/lib/format'
 import { cn } from '@/lib/utils'
 
-/** Histórico de movimientos variables (GVM e IVM). Solo se muestra en PC. */
+const FILTERS = [
+  { value: 'all', label: 'Todos', types: null, empty: 'Aún no hay flujos. Añade uno con los botones de flujo.' },
+  { value: 'variable', label: 'Variables', types: VARIABLE_TYPES, empty: 'No hay movimientos variables (GVM / IVM).' },
+  { value: 'fixed', label: 'Fijos', types: FIXED_TYPES, empty: 'No hay flujos fijos (GFM / IFM).' },
+]
+
+/** Historial de todos los flujos, con filtro por variables o fijos. Solo se muestra en PC. */
 export function HistoryTable({ onEdit, className }) {
   const { version, refresh } = useFinanceData()
-  const { data: flows, error, loading } = useApiQuery(() => api.listFlows(VARIABLE_TYPES), [version])
+  const { data: allFlows, error, loading } = useApiQuery(() => api.listFlows(), [version])
+  const [filterValue, setFilterValue] = useState('all')
+  const filter = FILTERS.find((f) => f.value === filterValue)
+  const flows = allFlows && (filter.types ? allFlows.filter((f) => filter.types.includes(f.flow_type)) : allFlows)
   const [toDelete, setToDelete] = useState(null)
   const [deleteError, setDeleteError] = useState(null)
 
@@ -41,9 +51,25 @@ export function HistoryTable({ onEdit, className }) {
   return (
     <Card className={cn('gap-4', className)}>
       <CardHeader>
-        <CardTitle className="text-sm tracking-wide uppercase">History</CardTitle>
+        <CardTitle className="flex items-center gap-2 text-sm tracking-wide uppercase">
+          Historial
+          {loading && <LoaderCircle className="text-muted-foreground size-3.5 animate-spin opacity-60" aria-label="Cargando" />}
+        </CardTitle>
         <CardAction>
-          {loading && <LoaderCircle className="text-muted-foreground size-4 animate-spin" aria-label="Cargando" />}
+          <ToggleGroup
+            type="single"
+            size="sm"
+            variant="outline"
+            value={filterValue}
+            onValueChange={(next) => next && setFilterValue(next)}
+            aria-label="Filtrar el historial"
+          >
+            {FILTERS.map((f) => (
+              <ToggleGroupItem key={f.value} value={f.value} className="px-3 text-xs">
+                {f.label}
+              </ToggleGroupItem>
+            ))}
+          </ToggleGroup>
         </CardAction>
       </CardHeader>
       <CardContent>
@@ -54,7 +80,7 @@ export function HistoryTable({ onEdit, className }) {
         )}
         {flows && flows.length === 0 ? (
           <p className="text-muted-foreground py-8 text-center text-sm">
-            Aún no hay movimientos variables. Añade un GVM o un IVM para verlos aquí.
+            {filter.empty}
           </p>
         ) : (
           flows && (
@@ -94,6 +120,7 @@ export function HistoryTable({ onEdit, className }) {
                       >
                         {income ? '+' : '−'}
                         {formatEUR(flow.amount)}
+                        {flow.is_recurring && <span className="text-muted-foreground text-xs">/mes</span>}
                       </TableCell>
                       <TableCell>
                         <div className="flex justify-end gap-1">
@@ -123,7 +150,7 @@ export function HistoryTable({ onEdit, className }) {
       <AlertDialog open={toDelete !== null} onOpenChange={(open) => !open && setToDelete(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>¿Eliminar este movimiento?</AlertDialogTitle>
+            <AlertDialogTitle>¿Eliminar este flujo?</AlertDialogTitle>
             <AlertDialogDescription>
               Se eliminará «{toDelete?.concept}» y la gráfica se recalculará. Esta acción no se puede deshacer.
             </AlertDialogDescription>

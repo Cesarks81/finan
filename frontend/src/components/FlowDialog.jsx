@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { LoaderCircle } from 'lucide-react'
+import { LoaderCircle, Trash2 } from 'lucide-react'
 
 import { api } from '@/api/client'
 import { Button } from '@/components/ui/button'
@@ -16,10 +16,9 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useFinanceData } from '@/hooks/useFinanceData'
-import { FLOW_ORDER, FLOW_TYPES } from '@/lib/flowTypes'
+import { FIXED_TYPES, FLOW_ORDER, FLOW_TYPES } from '@/lib/flowTypes'
 import { toISODate } from '@/lib/format'
 
-const FIXED_TYPES = ['GFM', 'IFM']
 
 // Periodicidad de un IVM: puntual o temporal (durante N meses / hasta una fecha).
 const IVM_MODES = [
@@ -93,6 +92,7 @@ function FlowForm({ flow, defaultType, onDone }) {
   const [form, setForm] = useState(() => initialForm(flow, defaultType))
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
 
   const type = FLOW_TYPES[form.flow_type]
   const set = (field) => (eventOrValue) =>
@@ -110,6 +110,19 @@ function FlowForm({ flow, defaultType, onDone }) {
     try {
       if (flow) await api.updateFlow(flow.id, payload)
       else await api.createFlow(payload)
+      refresh()
+      onDone()
+    } catch (err) {
+      setError(err.message)
+      setSaving(false)
+    }
+  }
+
+  async function handleDelete() {
+    setSaving(true)
+    setError(null)
+    try {
+      await api.deleteFlow(flow.id)
       refresh()
       onDone()
     } catch (err) {
@@ -240,17 +253,45 @@ function FlowForm({ flow, defaultType, onDone }) {
         </p>
       )}
 
-      <DialogFooter>
-        <DialogClose asChild>
-          <Button type="button" variant="outline">
-            Cancelar
+      {confirmingDelete ? (
+        <div className="grid gap-3 rounded-lg border border-destructive/40 p-3">
+          <p className="text-sm">
+            ¿Eliminar «{flow.concept}»? La gráfica se recalculará sin él. No se puede deshacer.
+          </p>
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <Button type="button" variant="outline" onClick={() => setConfirmingDelete(false)} disabled={saving}>
+              No, mantener
+            </Button>
+            <Button type="button" variant="destructive" onClick={handleDelete} disabled={saving}>
+              {saving && <LoaderCircle className="animate-spin" />}
+              Sí, eliminar
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <DialogFooter>
+          {flow && (
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => setConfirmingDelete(true)}
+              className="text-destructive hover:text-destructive sm:mr-auto"
+            >
+              <Trash2 />
+              Eliminar
+            </Button>
+          )}
+          <DialogClose asChild>
+            <Button type="button" variant="outline">
+              Cancelar
+            </Button>
+          </DialogClose>
+          <Button type="submit" disabled={saving}>
+            {saving && <LoaderCircle className="animate-spin" />}
+            {flow ? 'Guardar cambios' : 'Añadir'}
           </Button>
-        </DialogClose>
-        <Button type="submit" disabled={saving}>
-          {saving && <LoaderCircle className="animate-spin" />}
-          {flow ? 'Guardar cambios' : 'Añadir'}
-        </Button>
-      </DialogFooter>
+        </DialogFooter>
+      )}
     </form>
   )
 }
