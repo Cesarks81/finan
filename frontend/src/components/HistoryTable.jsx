@@ -44,7 +44,7 @@ const FILTERS = [
   },
 ]
 
-/** Historial de los flujos: variables, fijos y, aparte, los ya terminados. Solo se muestra en PC. */
+/** Historial de los flujos: variables, fijos y los ya terminados. Solo se muestra en PC. */
 export function HistoryTable({ onEdit, className }) {
   const { version, refresh } = useFinanceData()
   const { data: allFlows, error, loading } = useApiQuery(() => api.listFlows(), [version])
@@ -79,19 +79,9 @@ export function HistoryTable({ onEdit, className }) {
             value={filterValue}
             onValueChange={(next) => next && setFilterValue(next)}
             aria-label="Filtrar el historial"
-            className="shadow-none"
           >
             {FILTERS.map((f) => (
-              <ToggleGroupItem
-                key={f.value}
-                value={f.value}
-                className={cn(
-                  'px-3 text-xs shadow-xs',
-                  // «Fijos» cierra el bloque principal y «Terminados» queda un poco aparte.
-                  f.value === 'fixed' && 'rounded-r-md',
-                  f.value === 'ended' && 'ml-2 rounded-md data-[variant=outline]:border-l',
-                )}
-              >
+              <ToggleGroupItem key={f.value} value={f.value} className="px-3 text-xs">
                 {f.label}
               </ToggleGroupItem>
             ))}
