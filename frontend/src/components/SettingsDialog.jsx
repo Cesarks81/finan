@@ -328,6 +328,95 @@ function SavingsTargetSetting() {
   return <SavingsTargetForm settings={data} />
 }
 
+/** Objetivo de patrimonio: nombre e importe. Vacío el importe, se quita. */
+function GoalForm({ settings }) {
+  const { refresh } = useFinanceData()
+  const [name, setName] = useState(settings.goal_name ?? '')
+  const [amount, setAmount] = useState(settings.goal_amount ?? '')
+  const [status, setStatus] = useState('idle') // idle | saving | saved
+  const [error, setError] = useState(null)
+  const edit = (setter) => (event) => {
+    setter(event.target.value)
+    setStatus('idle')
+  }
+
+  async function save(changes) {
+    setStatus('saving')
+    setError(null)
+    try {
+      await api.patchSettings(changes)
+      refresh()
+      setStatus('saved')
+    } catch (err) {
+      setError(err.message)
+      setStatus('idle')
+    }
+  }
+
+  function handleSubmit(event) {
+    event.preventDefault()
+    const value = String(amount).trim().replace(',', '.')
+    save({ goal_name: name.trim() || null, goal_amount: value === '' ? null : value })
+  }
+
+  function handleRemove() {
+    setName('')
+    setAmount('')
+    save({ goal_name: null, goal_amount: null })
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="grid gap-4">
+      <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-4">
+        <div className="grid gap-2">
+          <Label htmlFor="goal-name">Para qué</Label>
+          <Input id="goal-name" value={name} onChange={edit(setName)} maxLength={60} />
+        </div>
+        <div className="grid gap-2">
+          <Label htmlFor="goal-amount">Importe (€)</Label>
+          <Input
+            id="goal-amount"
+            type="number"
+            inputMode="decimal"
+            min="0.01"
+            step="0.01"
+            value={amount}
+            onChange={edit(setAmount)}
+          />
+        </div>
+      </div>
+      {error && (
+        <p role="alert" className="text-destructive text-sm">
+          {error}
+        </p>
+      )}
+      <div className="flex items-center justify-end gap-3">
+        {status === 'saved' && (
+          <p role="status" className="text-income flex items-center gap-1 text-sm">
+            <Check className="size-4" /> Guardado
+          </p>
+        )}
+        {settings.goal_amount && (
+          <Button type="button" variant="ghost" onClick={handleRemove} disabled={status === 'saving'}>
+            Quitar
+          </Button>
+        )}
+        <Button type="submit" disabled={status === 'saving'}>
+          {status === 'saving' && <LoaderCircle className="animate-spin" />}
+          Guardar
+        </Button>
+      </div>
+    </form>
+  )
+}
+
+function GoalSetting() {
+  const { data, error } = useFinanceData().settings
+  if (error) return <p className="text-destructive text-sm">{error.message}</p>
+  if (!data) return <LoaderCircle className="text-muted-foreground mx-auto size-5 animate-spin" />
+  return <GoalForm settings={data} />
+}
+
 function SessionSetting() {
   const { logout } = useAuth()
   return (
@@ -355,6 +444,13 @@ export function SettingsDialog({ open, onOpenChange }) {
 
         <Section title="Gráfica">
           <ChartSettings />
+        </Section>
+
+        <Section
+          title="Objetivo"
+          description="El patrimonio al que quieres llegar (un colchón, la entrada de un piso…). finan te dice cuándo llegas y, al añadir un gasto o un ingreso, cuánto lo adelanta o lo retrasa."
+        >
+          <GoalSetting />
         </Section>
 
         <Section

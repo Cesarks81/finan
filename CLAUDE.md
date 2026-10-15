@@ -24,11 +24,17 @@ Aplicación web progresiva (PWA) de finanzas personales minimalista orientada a 
 * **IFM (Ingreso Fijo Mensual):** Ingresos estables y recurrentes a largo plazo (nómina habitual).
 
 ### Patrimonio Inicial
-* Se guarda en la tabla `settings` (una fila; `GET`/`PUT /settings`): importe (puede ser negativo) y fecha. La misma fila guarda el ahorro mensual deseado (`savings_target`), que se cambia con `PATCH /settings` (solo los campos enviados; `PUT` conserva el resto).
+* Se guarda en la tabla `settings` (una fila; `GET`/`PUT /settings`): importe (puede ser negativo) y fecha. La misma fila guarda el ahorro mensual deseado (`savings_target`) y el objetivo (`goal_name`, `goal_amount`), que se cambian con `PATCH /settings` (solo los campos enviados; `PUT` conserva el resto).
 * Es el patrimonio **al empezar** esa fecha: los flujos desde ese día se suman o restan a partir de él y los anteriores reconstruyen la curva hacia atrás. Sin fecha, es el saldo previo a cualquier flujo.
 
 ### Disponible este mes
 * «Págate primero»: con un ahorro mensual definido en Ajustes, *Disponible este mes* = ingresos del mes (IFM + IVM) − gastos fijos (GFM) − ese ahorro − gastos variables del mes (GVM, también la cuota de los que van a plazos) (`monthlyBudget` en `lib/budget.js`, a partir de `monthTotals`). Se muestra bajo el patrimonio en móvil y como pastilla en el encabezado en PC (`MonthlyBudget.jsx`), con una barra de lo que queda; si se pasa, «Este mes te has pasado X €»; si los ingresos no cubren fijos + ahorro, «Sin margen». Sin ahorro definido, invita a definirlo (abre Ajustes).
+
+### Objetivo con fecha
+* En Ajustes («Objetivo»: para qué e importe; «Quitar» lo borra). La fecha en que se alcanza sale de una proyección mensual de 40 años que se pide junto a las tres vistas (`long` en `lib/projections.js`): es el primer mes cuyo patrimonio llega al objetivo (`goalForecast` en `lib/goal.js`), y se calcula también con 100 €/mes más.
+* En PC, tarjeta bajo los botones de flujo (`GoalCard.jsx`): progreso (patrimonio de hoy / objetivo, con barra), «Llegas en mayo de 2028» y «Con 100 €/mes más, en …»; «¡Objetivo conseguido!» si ya se alcanzó, o aviso si no se llega en 40 años. «Editar» abre Ajustes.
+* En la gráfica de patrimonio (móvil y PC), línea horizontal discontinua azul en el importe del objetivo con la etiqueta «Meta 20K € · may 2028»; si queda por encima de la escala visible, solo la etiqueta arriba a la derecha con «↑».
+* **Así te afecta:** al crear o editar un flujo, con el formulario completo, el modal muestra cómo cambia *Disponible este mes* y el mes del objetivo (`goalImpact`: suma o resta a la proyección larga lo que aporta el flujo mes a mes, sin el flujo editado, respetando la fecha del patrimonio inicial como hace el backend). Lo que empeora va en rojo y lo que mejora en verde.
 
 ### Lógica de Visualización y Responsividad
 * **Vista PC:** encabezado con `finan` a la izquierda y, a la derecha, el valor del portfolio y el engranaje de ajustes. Debajo, dos columnas: a la izquierda la gráfica `EVOLUCIÓN PATRIMONIO` y el `Historial`; a la derecha, la pila de los 4 botones de flujo.
@@ -70,11 +76,11 @@ Aplicación web progresiva (PWA) de finanzas personales minimalista orientada a 
     ├── src/
     │   ├── components/
     │   │   ├── ui/         # Componentes shadcn/ui (Button, Card, Checkbox, Dialog, Select, Table, ToggleGroup…)
-    │   │   └── *.jsx       # Gráfica (con selector D M A), botones y modal de flujo, Ajustes, Historial, acceso
+    │   │   └── *.jsx       # Gráfica (con selector D M A), botones y modal de flujo, Ajustes, Historial, disponible, objetivo (GoalCard), acceso
     │   ├── views/          # Dashboard principal (Layout PC vs. Mobile)
     │   ├── api/            # Cliente Fetch de la API (`/api` del mismo dominio; envía el token de sesión)
     │   ├── hooks/          # useTheme, useAuth, useFinanceData (recarga tras cambios), useMediaQuery, usePersistentState
-    │   ├── lib/            # Formato (€, fechas), tipos de flujo, carga de las 3 vistas (projections.js), cn()
+    │   ├── lib/            # Formato (€, fechas), tipos de flujo, carga de las 3 vistas y la larga (projections.js), presupuesto (budget.js), objetivo (goal.js), cn()
     │   └── App.jsx
     ├── public/             # Favicon e iconos de la PWA (192, 512, maskable, apple-touch-icon)
     ├── vite.config.js      # Alias @/, Tailwind y PWA (vite-plugin-pwa: manifest + service worker)

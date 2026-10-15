@@ -3,6 +3,7 @@ import { History, Settings } from 'lucide-react'
 
 import { FlowButtons } from '@/components/FlowButtons'
 import { FlowDialog } from '@/components/FlowDialog'
+import { GoalCard } from '@/components/GoalCard'
 import { HistoryTable } from '@/components/HistoryTable'
 import { MonthlyBudget } from '@/components/MonthlyBudget'
 import { NetWorthChart } from '@/components/NetWorthChart'
@@ -110,6 +111,12 @@ export function Dashboard() {
             )}
           />
         </div>
+        {/* PC: la tarjeta del objetivo, en la columna de los botones, a la altura del Historial. */}
+        {isDesktop && (
+          <div className="flex flex-col gap-3 md:col-start-2 md:row-start-2 md:self-start">
+            <GoalCard onEdit={() => setSettingsOpen(true)} />
+          </div>
+        )}
       </main>
 
       <FlowDialog

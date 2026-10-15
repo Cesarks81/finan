@@ -22,10 +22,12 @@ import {
   currentPeriod,
   formatEUR,
   formatEURCompact,
+  formatMonthYear,
   formatPercentSigned,
   formatPointsSigned,
   formatPeriod,
 } from '@/lib/format'
+import { goalForecast } from '@/lib/goal'
 import { savingsTrend } from '@/lib/savingsStats'
 import { cn } from '@/lib/utils'
 
@@ -343,7 +345,7 @@ export function NetWorthChart({ className }) {
     delete plotRef.current?.dataset.drawing
   }, [])
   // Las tres vistas ya están en memoria: cambiar de una a otra no hace peticiones.
-  const { projections, chart } = useFinanceData()
+  const { projections, chart, settings } = useFinanceData()
   const { splitLines, calendar } = chart
   const { error, loading } = projections
   const data = projections.data?.[granularity]
@@ -366,11 +368,32 @@ export function NetWorthChart({ className }) {
   const hasNegative = !splitLines && points.some((p) => p.balance < 0)
   // Solo en la vista de patrimonio y si se ha indicado un patrimonio inicial (con su fecha).
   const initialBalance = !splitLines && data?.balance_date ? Number(data.initial_balance) : null
+
+  // Objetivo (vista de patrimonio): línea de meta con cuándo se llega. Si queda por encima de la
+  // escala, su etiqueta se fija arriba con una flecha, para que se vea siempre.
+  const goalAmount = !splitLines && settings.data?.goal_amount ? Number(settings.data.goal_amount) : null
+  const goalForecastResult = useMemo(
+    () =>
+      goalAmount !== null && projections.data?.long && projections.data.todayBalance !== undefined
+        ? goalForecast(projections.data.long, goalAmount, projections.data.todayBalance)
+        : null,
+    [goalAmount, projections.data],
+  )
+  const goalLabel =
+    goalForecastResult &&
+    `Meta ${formatEURCompact(goalAmount)} · ${
+      goalForecastResult.reached
+        ? 'conseguida'
+        : goalForecastResult.month
+          ? formatMonthYear(goalForecastResult.month)
+          : 'más de 40 años'
+    }`
   const scale = useMemo(
     () =>
       yScale(splitLines ? points.flatMap((p) => [p.incomeTotal, p.expenseTotal]) : points.map((p) => p.balance)),
     [points, splitLines],
   )
+  const goalAboveScale = goalLabel && typeof scale.domain[1] === 'number' && goalAmount > scale.domain[1]
 
   return (
     <Card
@@ -486,6 +509,16 @@ export function NetWorthChart({ className }) {
                     cursor={{ stroke: 'var(--muted-foreground)', strokeDasharray: '3 3' }}
                   />
                   {hasNegative && <ReferenceLine y={0} stroke="var(--expense)" strokeOpacity={0.5} />}
+                  {goalLabel && !goalAboveScale && (
+                    <ReferenceLine
+                      y={goalAmount}
+                      stroke="var(--chart-1)"
+                      strokeOpacity={0.6}
+                      strokeWidth={1.5}
+                      strokeDasharray="6 4"
+                      label={{ value: goalLabel, position: 'insideTopRight', fill: 'var(--chart-1)', fontSize: 11, fontWeight: 500 }}
+                    />
+                  )}
                   {initialBalance !== null && (
                     // Patrimonio inicial de Ajustes: línea horizontal muy tenue, sin etiqueta (solo si cae en la vista).
                     <ReferenceLine
@@ -531,6 +564,11 @@ export function NetWorthChart({ className }) {
                 </AreaChart>
               </ResponsiveContainer>
             )
+          )}
+          {goalAboveScale && (
+            <span className="text-chart-1 pointer-events-none absolute top-1 right-3 text-[11px] font-medium">
+              {goalLabel} ↑
+            </span>
           )}
           {/* Justo encima de las etiquetas del eje X. */}
           <GranularitySelector

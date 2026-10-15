@@ -52,6 +52,11 @@ export const formatDate = (value) => fullDate.format(parseISODate(value))
 /** «octubre de 2026» (por defecto, el mes en curso). */
 export const formatMonth = (date = new Date()) => monthLong.format(date)
 
+const monthYearShort = new Intl.DateTimeFormat('es-ES', { month: 'short', year: 'numeric' })
+/** Mes 'YYYY-MM' como «abr 2029» (o, con `long`, «abril de 2029»). */
+export const formatMonthYear = (period, { long = false } = {}) =>
+  (long ? monthLong : monthYearShort).format(parseISODate(period))
+
 export function addDays(date, days) {
   const result = new Date(date)
   result.setDate(result.getDate() + days)

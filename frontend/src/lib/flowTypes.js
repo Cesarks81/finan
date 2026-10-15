@@ -42,14 +42,14 @@ export const VARIABLE_TYPES = ['GVM', 'IVM']
 export const FIXED_TYPES = ['GFM', 'IFM']
 
 /** Fecha del pago número `index` (0 = el primero), con el día ajustado a fin de mes como en el backend. */
-function monthlyPayment(startDate, index) {
+export function monthlyPayment(startDate, index) {
   const [year, month, day] = startDate.split('-').map(Number)
   const daysInMonth = new Date(year, month + index, 0).getDate()
   return toISODate(new Date(year, month - 1 + index, Math.min(day, daysInMonth)))
 }
 
 /** Fecha del último pago de un flujo recurrente, o null si no tiene fin. */
-function lastPayment(flow) {
+export function lastPayment(flow) {
   const ends = []
   if (flow.end_date) ends.push(flow.end_date)
   if (flow.duration_months) ends.push(monthlyPayment(flow.start_date, flow.duration_months - 1))
@@ -73,6 +73,10 @@ function remainingPayments(flow, last, today) {
  * - `ended`: si ya hizo su último pago (el Historial lo lleva a «Terminados»).
  * - `hint`: fecha del último pago, si la tiene.
  */
+/** Si un flujo se repite cada mes (misma regla que el backend: fijos siempre; variables con fin). */
+export const isRecurringFlow = (flow) =>
+  FIXED_TYPES.includes(flow.flow_type) || Boolean(flow.duration_months) || Boolean(flow.end_date)
+
 export function describeSchedule(flow, today = toISODate(new Date())) {
   if (!flow.is_recurring) return { label: 'Puntual' }
   const last = lastPayment(flow)

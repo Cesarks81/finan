@@ -66,6 +66,12 @@ class SettingsPatch(BaseModel):
     savings_target: Annotated[Decimal, Field(ge=0, max_digits=12, decimal_places=2)] | None = Field(
         default=None, description="Lo que se quiere ahorrar cada mes"
     )
+    goal_name: Annotated[str, Field(min_length=1, max_length=60)] | None = Field(
+        default=None, description="Nombre del objetivo de patrimonio"
+    )
+    goal_amount: Annotated[Decimal, Field(gt=0, max_digits=14, decimal_places=2)] | None = Field(
+        default=None, description="Patrimonio que se quiere alcanzar"
+    )
 
 
 class SettingsRead(BaseModel):
@@ -74,6 +80,8 @@ class SettingsRead(BaseModel):
     initial_balance: Decimal
     balance_date: date | None
     savings_target: Decimal | None = None
+    goal_name: str | None = None
+    goal_amount: Decimal | None = None
 
 
 class Granularity(str, enum.Enum):
