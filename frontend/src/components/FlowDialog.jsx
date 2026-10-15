@@ -160,18 +160,10 @@ function FlowForm({ flow, defaultType, onDone }) {
           </Field>
         )}
 
-        <Field label="Concepto" htmlFor="flow-concept">
-          <Input
-            id="flow-concept"
-            value={form.concept}
-            onChange={set('concept')}
-            maxLength={120}
-            required
-            autoFocus
-          />
-        </Field>
-
-        <div className="grid grid-cols-2 gap-4">
+        {/* Primero el importe (el cursor empieza ahí: en móvil sale el teclado numérico, más bajo)
+            y la fecha; después el concepto. Columnas que pueden encoger: en iOS el campo de fecha
+            tiene un ancho mínimo y se salía por la derecha. */}
+        <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-4">
           <Field
             label={FIXED_TYPES.includes(form.flow_type) || form.variableMode !== 'once' ? 'Importe mensual (€)' : 'Importe (€)'}
             htmlFor="flow-amount"
@@ -185,12 +177,31 @@ function FlowForm({ flow, defaultType, onDone }) {
               value={form.amount}
               onChange={set('amount')}
               required
+              autoFocus
             />
           </Field>
           <Field label={startDateLabel(form)} htmlFor="flow-start">
-            <Input id="flow-start" type="date" value={form.start_date} onChange={set('start_date')} required />
+            <Input
+              id="flow-start"
+              type="date"
+              value={form.start_date}
+              onChange={set('start_date')}
+              required
+              className="min-w-0 appearance-none"
+            />
           </Field>
         </div>
+
+        <Field label="Concepto" htmlFor="flow-concept">
+          <Input
+            id="flow-concept"
+            value={form.concept}
+            onChange={set('concept')}
+            maxLength={120}
+            required
+          />
+        </Field>
+
 
         {FIXED_TYPES.includes(form.flow_type) && (
           <Field label="Fecha de fin (opcional)" htmlFor="flow-end" hint="Déjala vacía si no tiene fecha de fin.">
