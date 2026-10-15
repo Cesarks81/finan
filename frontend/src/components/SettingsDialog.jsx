@@ -1,5 +1,17 @@
-import { useState } from 'react'
-import { Check, LoaderCircle, LogOut, RotateCcw } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import {
+  ChartLine,
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  LoaderCircle,
+  LogOut,
+  Moon,
+  RotateCcw,
+  Target,
+  TrendingUp,
+  Wallet,
+} from 'lucide-react'
 
 import { api } from '@/api/client'
 import { Button } from '@/components/ui/button'
@@ -11,37 +23,9 @@ import { Switch } from '@/components/ui/switch'
 import { useAuth } from '@/hooks/useAuth'
 import { useFinanceData } from '@/hooks/useFinanceData'
 import { useTheme } from '@/hooks/useTheme'
-import { toISODate } from '@/lib/format'
+import { formatDate, formatEURWhole, toISODate } from '@/lib/format'
 import { investmentOf, investmentValue } from '@/lib/investment'
-
-function Section({ title, description, children }) {
-  return (
-    <section className="grid gap-3">
-      <div className="grid gap-1">
-        <h3 className="text-sm font-semibold">{title}</h3>
-        {description && <p className="text-muted-foreground text-xs">{description}</p>}
-      </div>
-      {children}
-    </section>
-  )
-}
-
-function ThemeSetting() {
-  const { theme, setTheme } = useTheme()
-  return (
-    <div className="flex items-center justify-between gap-4 rounded-lg border p-3">
-      <Label htmlFor="settings-dark-mode" className="grid gap-1">
-        Modo oscuro
-        <span className="text-muted-foreground text-xs font-normal">Desactívalo para usar el modo claro.</span>
-      </Label>
-      <Switch
-        id="settings-dark-mode"
-        checked={theme === 'dark'}
-        onCheckedChange={(checked) => setTheme(checked ? 'dark' : 'light')}
-      />
-    </div>
-  )
-}
+import { cn } from '@/lib/utils'
 
 function SwitchSetting({ id, label, description, checked, onCheckedChange }) {
   return (
@@ -449,48 +433,44 @@ function InvestmentForm({ settings }) {
 
   return (
     <form onSubmit={handleSubmit} className="grid gap-4">
-      <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-4">
-        <div className="grid gap-2">
-          <Label htmlFor="invest-amount">Invertido hoy (€)</Label>
-          <Input
-            id="invest-amount"
-            type="number"
-            inputMode="decimal"
-            min="0"
-            step="0.01"
-            value={form.amount}
-            onChange={edit('amount')}
-            required
-          />
-        </div>
-        <div className="grid gap-2">
-          <Label htmlFor="invest-monthly">Aportas al mes (€)</Label>
-          <Input
-            id="invest-monthly"
-            type="number"
-            inputMode="decimal"
-            min="0"
-            step="0.01"
-            value={form.monthly}
-            onChange={edit('monthly')}
-          />
-        </div>
+      <div className="grid gap-2">
+        <Label htmlFor="invest-amount">Invertido hoy (€)</Label>
+        <Input
+          id="invest-amount"
+          type="number"
+          inputMode="decimal"
+          min="0"
+          step="0.01"
+          value={form.amount}
+          onChange={edit('amount')}
+          required
+        />
       </div>
-      <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-4">
-        <div className="grid gap-2">
-          <Label htmlFor="invest-return">Rentabilidad anual (%)</Label>
-          <Input
-            id="invest-return"
-            type="number"
-            inputMode="decimal"
-            min="-50"
-            max="50"
-            step="0.1"
-            value={form.rate}
-            onChange={edit('rate')}
-            required
-          />
-        </div>
+      <div className="grid gap-2">
+        <Label htmlFor="invest-monthly">Aportas al mes (€)</Label>
+        <Input
+          id="invest-monthly"
+          type="number"
+          inputMode="decimal"
+          min="0"
+          step="0.01"
+          value={form.monthly}
+          onChange={edit('monthly')}
+        />
+      </div>
+      <div className="grid gap-2">
+        <Label htmlFor="invest-return">Rentabilidad anual esperada (%)</Label>
+        <Input
+          id="invest-return"
+          type="number"
+          inputMode="decimal"
+          min="-50"
+          max="50"
+          step="0.1"
+          value={form.rate}
+          onChange={edit('rate')}
+          required
+        />
       </div>
       {error && (
         <p role="alert" className="text-destructive text-sm">
@@ -524,68 +504,190 @@ function InvestmentSetting() {
   return <InvestmentForm settings={data} />
 }
 
-function SessionSetting() {
-  const { logout } = useAuth()
+const PAGES = {
+  chart: {
+    title: 'Gráfica',
+    description: 'Cómo se ve la gráfica en este dispositivo.',
+    Content: ChartSettings,
+  },
+  balance: {
+    title: 'Patrimonio inicial',
+    description:
+      'Tu patrimonio neto (ahorros menos deudas) en una fecha, normalmente hoy. La gráfica parte de ese valor: suma o resta los flujos desde esa fecha y reconstruye hacia atrás los anteriores. Puede ser negativo.',
+    Content: InitialBalanceSetting,
+  },
+  goal: {
+    title: 'Objetivo',
+    description:
+      'El patrimonio al que quieres llegar (un colchón, la entrada de un piso…). finan lo marca en la gráfica con una línea azul, te dice cuándo llegas y, al añadir un gasto o un ingreso, cuánto lo adelanta o lo retrasa.',
+    Content: GoalSetting,
+  },
+  investment: {
+    title: 'Inversión',
+    description:
+      'Qué parte de tu patrimonio está en fondos, acciones o similares (ya cuenta dentro de tu patrimonio: aquí solo dices cuánto está invertido). Solo esa parte crece con la rentabilidad; el resto, no. Lo que aportas cada mes sale de lo que ahorras (no es un gasto) y también rinde. La gráfica sigue mostrando el patrimonio total.',
+    Content: InvestmentSetting,
+  },
+  reset: {
+    title: 'Restablecer datos',
+    description: 'Elimina de golpe todos los gastos, todos los ingresos o ambos. El patrimonio inicial se mantiene.',
+    Content: ResetSetting,
+  },
+}
+
+function Group({ title, children }) {
   return (
-    <Button variant="outline" onClick={logout} className="justify-self-start">
-      <LogOut />
-      Cerrar sesión en este dispositivo
-    </Button>
+    <section className="grid gap-1.5">
+      <h3 className="text-muted-foreground px-1 text-xs font-medium tracking-wide uppercase">{title}</h3>
+      <div className="divide-y overflow-hidden rounded-lg border">{children}</div>
+    </section>
   )
 }
 
-/** Modal de ajustes (engranaje del encabezado): tema, gráfica, patrimonio inicial, restablecer datos y sesión. */
-export function SettingsDialog({ open, onOpenChange }) {
-  const { required: hasSession } = useAuth()
+/** Fila del menú: icono, nombre y, debajo, el valor actual; abre su pantalla (o hace `onClick`). */
+function Row({ icon: Icon, label, summary, onClick, tone }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="hover:bg-accent flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors"
+    >
+      <Icon className={cn('text-muted-foreground size-4 shrink-0', tone)} aria-hidden="true" />
+      <span className="grid min-w-0 flex-1 gap-0.5">
+        <span className={cn('text-sm font-medium', tone)}>{label}</span>
+        {summary && <span className="text-muted-foreground truncate text-xs">{summary}</span>}
+      </span>
+      <ChevronRight className="text-muted-foreground size-4 shrink-0" aria-hidden="true" />
+    </button>
+  )
+}
+
+function ThemeRow() {
+  const { theme, setTheme } = useTheme()
+  return (
+    <div className="flex items-center gap-3 px-3 py-2.5">
+      <Moon className="text-muted-foreground size-4 shrink-0" aria-hidden="true" />
+      <Label htmlFor="settings-dark-mode" className="flex-1 text-sm font-medium">
+        Modo oscuro
+      </Label>
+      <Switch
+        id="settings-dark-mode"
+        checked={theme === 'dark'}
+        onCheckedChange={(checked) => setTheme(checked ? 'dark' : 'light')}
+      />
+    </div>
+  )
+}
+
+/** Resúmenes de cada fila del menú, con lo que hay guardado. */
+function summaries(settings, chart) {
+  const options = [
+    chart.splitLines && 'Ingresos y gastos',
+    chart.calendar && 'Calendario',
+    chart.realTerms && `€ de hoy (${String(chart.inflation).replace('.', ',')} %)`,
+  ].filter(Boolean)
+  const investment = settings && investmentOf(settings)
+  return {
+    chart: options.length ? options.join(' · ') : 'Patrimonio, vista centrada en hoy',
+    balance: !settings
+      ? null
+      : settings.balance_date
+        ? `${formatEURWhole(settings.initial_balance)} · ${formatDate(settings.balance_date)}`
+        : 'Sin definir',
+    goal: !settings
+      ? null
+      : settings.goal_amount
+        ? `${settings.goal_name || 'Objetivo'} · ${formatEURWhole(settings.goal_amount)}`
+        : 'Sin definir',
+    investment: !settings
+      ? null
+      : investment
+        ? [
+            formatEURWhole(investment.amount),
+            investment.monthly ? `${formatEURWhole(investment.monthly)}/mes` : null,
+            `${String(Number(settings.invest_return)).replace('.', ',')} %`,
+          ]
+            .filter(Boolean)
+            .join(' · ')
+        : 'Sin inversión',
+  }
+}
+
+function Menu({ onOpen }) {
+  const { settings, chart } = useFinanceData()
+  const { required: hasSession, logout } = useAuth()
+  const summary = summaries(settings.data, chart)
+  return (
+    <div className="grid gap-5">
+      <Group title="Preferencias">
+        <ThemeRow />
+        <Row icon={ChartLine} label="Gráfica" summary={summary.chart} onClick={() => onOpen('chart')} />
+      </Group>
+      <Group title="Mis finanzas">
+        <Row icon={Wallet} label="Patrimonio inicial" summary={summary.balance} onClick={() => onOpen('balance')} />
+        <Row icon={Target} label="Objetivo" summary={summary.goal} onClick={() => onOpen('goal')} />
+        <Row icon={TrendingUp} label="Inversión" summary={summary.investment} onClick={() => onOpen('investment')} />
+      </Group>
+      <Group title="Datos">
+        <Row
+          icon={RotateCcw}
+          label="Restablecer datos"
+          summary="Borrar gastos, ingresos o ambos"
+          onClick={() => onOpen('reset')}
+          tone="text-destructive"
+        />
+        {hasSession && <Row icon={LogOut} label="Cerrar sesión en este dispositivo" onClick={logout} />}
+      </Group>
+    </div>
+  )
+}
+
+/**
+ * Ajustes, en dos niveles: un menú agrupado (Preferencias, Mis finanzas, Datos) donde cada fila
+ * enseña su valor actual, y una pantalla por ajuste con su explicación, con flecha para volver.
+ * El modo oscuro se cambia en el propio menú. `initialPage` abre directamente una pantalla
+ * (p. ej. 'goal' desde la tarjeta del objetivo).
+ */
+function SettingsBody({ initialPage }) {
+  const [page, setPage] = useState(initialPage)
+  const ref = useRef(null)
+  const current = page ? PAGES[page] : null
+
+  // Cada pantalla empieza arriba del todo.
+  useEffect(() => {
+    ref.current?.closest('[data-slot=dialog-content]')?.scrollTo(0, 0)
+  }, [page])
+
+  return (
+    <div ref={ref} className="grid gap-5">
+      <DialogHeader className="flex-row items-center gap-1 pr-6">
+        {current && (
+          <Button variant="ghost" size="icon" onClick={() => setPage(null)} aria-label="Volver a Ajustes" className="-my-2 -ml-2 size-8">
+            <ChevronLeft className="size-5" />
+          </Button>
+        )}
+        <DialogTitle>{current ? current.title : 'Ajustes'}</DialogTitle>
+        <DialogDescription className="sr-only">
+          {current ? current.description : 'Preferencias, mis finanzas y datos'}
+        </DialogDescription>
+      </DialogHeader>
+      {current ? (
+        <div className="grid gap-4">
+          <p className="text-muted-foreground text-xs leading-relaxed">{current.description}</p>
+          <current.Content />
+        </div>
+      ) : (
+        <Menu onOpen={setPage} />
+      )}
+    </div>
+  )
+}
+
+export function SettingsDialog({ open, onOpenChange, page = null, formKey }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="gap-6">
-        <DialogHeader>
-          <DialogTitle>Ajustes</DialogTitle>
-          <DialogDescription className="sr-only">Apariencia, gráfica, patrimonio inicial, restablecer datos y sesión</DialogDescription>
-        </DialogHeader>
-
-        <Section title="Apariencia">
-          <ThemeSetting />
-        </Section>
-
-        <Section title="Gráfica">
-          <ChartSettings />
-        </Section>
-
-        <Section
-          title="Objetivo"
-          description="El patrimonio al que quieres llegar (un colchón, la entrada de un piso…). finan lo marca en la gráfica con una línea azul, te dice cuándo llegas y, al añadir un gasto o un ingreso, cuánto lo adelanta o lo retrasa."
-        >
-          <GoalSetting />
-        </Section>
-
-        <Section
-          title="Inversión"
-          description="Qué parte de tu patrimonio está en fondos, acciones o similares (ya cuenta dentro de tu patrimonio: aquí solo dices cuánto está invertido). Solo esa parte crece con la rentabilidad; el resto, no. Lo que aportas cada mes sale de lo que ahorras (no es un gasto) y también rinde. La gráfica sigue mostrando el patrimonio total."
-        >
-          <InvestmentSetting />
-        </Section>
-
-        <Section
-          title="Patrimonio inicial"
-          description="Tu patrimonio neto (ahorros menos deudas) en una fecha, normalmente hoy. La gráfica parte de ese valor: suma o resta los flujos desde esa fecha y reconstruye hacia atrás los anteriores. Puede ser negativo."
-        >
-          <InitialBalanceSetting />
-        </Section>
-
-        <Section
-          title="Restablecer datos"
-          description="Elimina de golpe todos los gastos, todos los ingresos o ambos. El patrimonio inicial se mantiene."
-        >
-          <ResetSetting />
-        </Section>
-
-        {hasSession && (
-          <Section title="Sesión">
-            <SessionSetting />
-          </Section>
-        )}
+      <DialogContent>
+        <SettingsBody key={formKey} initialPage={page} />
       </DialogContent>
     </Dialog>
   )
