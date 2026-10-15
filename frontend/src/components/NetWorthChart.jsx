@@ -1,4 +1,4 @@
-import { useId, useMemo, useState } from 'react'
+import { useEffect, useId, useMemo, useState } from 'react'
 import { LoaderCircle } from 'lucide-react'
 import {
   Area,
@@ -9,6 +9,9 @@ import {
   Tooltip,
   XAxis,
   YAxis,
+  useActiveTooltipLabel,
+  usePlotArea,
+  useYAxisScale,
 } from 'recharts'
 
 import { GranularitySelector } from '@/components/GranularitySelector'
@@ -209,19 +212,56 @@ function SplitTooltip({ point }) {
   )
 }
 
-function ChartTooltip({ active, payload, granularity, splitLines }) {
+// Hueco entre las líneas y el borde inferior de la información.
+const TOOLTIP_GAP = 12
+// Ancho que puede llegar a ocupar la información (más el hueco de 10 px con el punto), y el
+// mínimo, según el modo: depende de las cifras, así que se trabaja con un margen.
+const TOOLTIP_WIDTH = { split: { min: 210, max: 250 }, balance: { min: 180, max: 230 } }
+
+/**
+ * Dentro de la gráfica: calcula a qué altura (px) queda lo más alto de las líneas en el tramo
+ * que ocupa la información alrededor del punto señalado (patrimonio, o la mayor de ingresos y
+ * gastos) y se lo pasa a `onChange`, para colocarla justo encima sin tapar ninguna línea.
+ */
+function TooltipAnchor({ points, splitLines, onChange }) {
+  const label = useActiveTooltipLabel()
+  const scale = useYAxisScale()
+  const plot = usePlotArea()
+  let top = null
+  const active = label === undefined ? -1 : points.findIndex((p) => p.period === label)
+  if (active >= 0 && scale && plot) {
+    // Tramo que tapa la información: a la derecha del punto, o a la izquierda si no cabe (como
+    // la coloca Recharts). Cerca del borde derecho puede ir a cualquiera de los dos lados según
+    // su ancho real, y se miran ambos.
+    const step = points.length > 1 ? plot.width / (points.length - 1) : plot.width
+    const width = TOOLTIP_WIDTH[splitLines ? 'split' : 'balance']
+    const reach = Math.ceil(width.max / step)
+    const x = active * step
+    const mayGoRight = x + width.min <= plot.width
+    const mayGoLeft = x + width.max > plot.width
+    const near = points.slice(mayGoLeft ? Math.max(0, active - reach) : active, mayGoRight ? active + reach + 1 : active + 1)
+    const highest = Math.max(...near.map((p) => (splitLines ? Math.max(p.incomeTotal, p.expenseTotal) : p.balance)))
+    top = scale(highest)
+  }
+  useEffect(() => onChange(Number.isFinite(top) ? top : null), [top, onChange])
+  return null
+}
+
+function ChartTooltip({ active, payload, granularity, splitLines, lifted }) {
   if (!active || !payload?.length) return null
   const point = payload[0].payload
+  // Anclado al punto más alto: sube toda su altura para quedar justo encima, sin tapar las líneas.
+  const box = cn('bg-popover text-popover-foreground grid gap-1.5 rounded-lg border px-3 py-2 text-xs shadow-md', lifted && '-translate-y-full')
   if (splitLines) {
     return (
-      <div className="bg-popover text-popover-foreground grid min-w-52 gap-1.5 rounded-lg border px-3 py-2 text-xs shadow-md">
+      <div className={cn(box, 'min-w-52')}>
         <p className="font-medium">{formatPeriod(point.period, granularity, { long: true })}</p>
         <SplitTooltip point={point} />
       </div>
     )
   }
   return (
-    <div className="bg-popover text-popover-foreground grid min-w-44 gap-1.5 rounded-lg border px-3 py-2 text-xs shadow-md">
+    <div className={cn(box, 'min-w-44')}>
       <p className="font-medium">{formatPeriod(point.period, granularity, { long: true })}</p>
       <div className="flex justify-between gap-4">
         <span className="text-muted-foreground">Patrimonio</span>
@@ -255,6 +295,7 @@ export function NetWorthChart({ className }) {
   const gradientId = useId()
   const isDesktop = useIsDesktop()
   const [granularity, setGranularity] = useState('M')
+  const [tooltipTop, setTooltipTop] = useState(null)
   // Las tres vistas ya están en memoria: cambiar de una a otra no hace peticiones.
   const { projections, chart } = useFinanceData()
   const { splitLines, calendar } = chart
@@ -380,8 +421,14 @@ export function NetWorthChart({ className }) {
                     axisLine={false}
                     width={isDesktop ? 'auto' : 72}
                   />
+                  <TooltipAnchor points={points} splitLines={splitLines} onChange={setTooltipTop} />
                   <Tooltip
-                    content={<ChartTooltip granularity={granularity} splitLines={splitLines} />}
+                    // Encima del punto más alto del periodo (la información sube su propia altura);
+                    // en horizontal sigue al dedo o al ratón. La escala deja libre la mitad de arriba.
+                    position={tooltipTop === null ? undefined : { y: tooltipTop - TOOLTIP_GAP }}
+                    allowEscapeViewBox={{ x: false, y: true }}
+                    animationDuration={150}
+                    content={<ChartTooltip granularity={granularity} splitLines={splitLines} lifted={tooltipTop !== null} />}
                     cursor={{ stroke: 'var(--muted-foreground)', strokeDasharray: '3 3' }}
                   />
                   {hasNegative && <ReferenceLine y={0} stroke="var(--expense)" strokeOpacity={0.5} />}
