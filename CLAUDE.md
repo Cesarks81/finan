@@ -34,7 +34,8 @@ Aplicación web progresiva (PWA) de finanzas personales minimalista orientada a 
 * **Botones de flujo:** orden fijo GFM, GVM, IFM, IVM. Cada uno muestra a la izquierda el tipo (código y nombre) y a la derecha lo que suma ese tipo en el mes en curso (`monthTotals` en `lib/flowTypes.js`: puntuales con fecha en ese mes y el pago del mes de los recurrentes activos), en verde los ingresos y en rojo los gastos. Son el único punto para añadir flujos (no hay botón `+` global). La lista de flujos está en la caché de `FinanceDataProvider` y la comparten con el Historial.
 * **Escala de la gráfica:** el eje Y se calcula a partir de los datos visibles (`yScale` en `NetWorthChart.jsx`): el máximo queda hacia el 40–50 % de la altura para dejar aire por encima, sin bajar de 0 si todo es positivo, y con marcas equidistantes de valores limpios (1, 2, 2,5 o 5 × 10ⁿ).
 * **Sección Historial:** **Exclusiva para la vista de PC** (ubicada debajo de la gráfica). Lista los flujos con un filtro *Variables / Fijos / Terminados*; en *Terminados* van solo los que ya hicieron su último pago o cobro, para no ensuciar las otras dos; el importe se muestra tal cual y la periodicidad indica «Puntual», «Mensual» (enmarcado, si no tiene fin) o los meses que quedan («4 meses», también enmarcado), que van bajando con el tiempo hasta «Terminado». Cada fila se puede editar o eliminar, y el modal de edición incluye también «Eliminar» (con confirmación), así que cualquier flujo, fijo o variable, se puede modificar, terminar con una fecha de fin o borrar; la proyección se recalcula al momento.
-* **Ajustes (engranaje):** modal con el interruptor de Modo Oscuro/Claro, el patrimonio inicial y, si hay contraseña, «Cerrar sesión en este dispositivo».
+* **Ajustes (engranaje):** modal con el interruptor de Modo Oscuro/Claro, el interruptor «Ingresos y gastos por separado», el patrimonio inicial y, si hay contraseña, «Cerrar sesión en este dispositivo». Los dos interruptores se guardan en el navegador (por dispositivo).
+* **Ingresos y gastos por separado:** con el ajuste activado, la gráfica (titulada «Ingresos y gastos», con leyenda) cambia la línea de patrimonio por dos líneas acumuladas desde el inicio de la vista: ingresos en azul (`--chart-1`) y gastos en rojo (`--expense`); la distancia entre ellas es lo ahorrado. El tooltip muestra ambos acumulados y su diferencia. Sale de los `income`/`expense` de las mismas proyecciones en caché, sin peticiones extra.
 
 ### Despliegue y Acceso
 * **Producción:** Vercel sirve el frontend estático y ejecuta la API como función Python (`api/index.py`; `vercel.json` envía ahí `/api/*`). La base de datos es Postgres en Neon. Guía paso a paso en `DEPLOY.md`.
@@ -67,7 +68,7 @@ Aplicación web progresiva (PWA) de finanzas personales minimalista orientada a 
     │   │   └── *.jsx       # Gráfica (con selector D M A), botones y modal de flujo, Ajustes, Historial, acceso
     │   ├── views/          # Dashboard principal (Layout PC vs. Mobile)
     │   ├── api/            # Cliente Fetch de la API (`/api` del mismo dominio; envía el token de sesión)
-    │   ├── hooks/          # useTheme, useAuth, useFinanceData (recarga tras cambios), useMediaQuery
+    │   ├── hooks/          # useTheme, useAuth, useFinanceData (recarga tras cambios), useMediaQuery, usePersistentState
     │   ├── lib/            # Formato (€, fechas), tipos de flujo, carga de las 3 vistas (projections.js), cn()
     │   └── App.jsx
     ├── public/             # Favicon e iconos de la PWA (192, 512, maskable, apple-touch-icon)
