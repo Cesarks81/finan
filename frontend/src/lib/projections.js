@@ -23,23 +23,35 @@ const RANGES = {
   },
 }
 
+// Proyección mensual larga para el objetivo (fecha en que se alcanza y el impacto de cada
+// flujo): desde el mes en curso, 40 años (480 meses; la API admite hasta 600).
+const LONG_YEARS = 40
+
 /**
- * Pide a la vez las tres vistas de la gráfica: `{ D, M, A, todayBalance }`. Con `calendar`,
- * las ventanas son el mes y el año en curso (ajuste «Vista de calendario»).
+ * Pide a la vez las tres vistas de la gráfica y la proyección larga del objetivo:
+ * `{ D, M, A, long, todayBalance }`. Con `calendar`, las ventanas son el mes y el año en curso
+ * (ajuste «Vista de calendario»).
  */
 export async function fetchAllProjections({ calendar = false } = {}) {
   const today = new Date()
   const ranges = RANGES[calendar ? 'calendar' : 'centered']
-  const results = await Promise.all(
-    GRANULARITIES.map((granularity) =>
-      api.getProjection({
-        granularity,
-        start: toISODate(ranges[granularity].start(today)),
-        end: toISODate(ranges[granularity].end(today)),
-      }),
+  const [results, long] = await Promise.all([
+    Promise.all(
+      GRANULARITIES.map((granularity) =>
+        api.getProjection({
+          granularity,
+          start: toISODate(ranges[granularity].start(today)),
+          end: toISODate(ranges[granularity].end(today)),
+        }),
+      ),
     ),
-  )
+    api.getProjection({
+      granularity: 'M',
+      start: toISODate(new Date(today.getFullYear(), today.getMonth(), 1)),
+      end: toISODate(new Date(today.getFullYear() + LONG_YEARS, today.getMonth(), 0)),
+    }),
+  ])
   const byGranularity = Object.fromEntries(GRANULARITIES.map((granularity, i) => [granularity, results[i]]))
   const todayBalance = byGranularity.D.points.find((p) => p.period === toISODate(today))?.balance
-  return { ...byGranularity, todayBalance }
+  return { ...byGranularity, long: long.points, todayBalance }
 }
