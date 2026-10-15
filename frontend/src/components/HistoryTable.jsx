@@ -22,19 +22,35 @@ import { describeSchedule, FIXED_TYPES, FLOW_TYPES, VARIABLE_TYPES } from '@/lib
 import { formatDate, formatEUR } from '@/lib/format'
 import { cn } from '@/lib/utils'
 
+// Los flujos que ya hicieron su último pago o cobro solo aparecen en «Terminados».
 const FILTERS = [
-  { value: 'all', label: 'Todos', types: null, empty: 'Aún no hay flujos. Añade uno con los botones de flujo.' },
-  { value: 'variable', label: 'Variables', types: VARIABLE_TYPES, empty: 'No hay movimientos variables (GVM / IVM).' },
-  { value: 'fixed', label: 'Fijos', types: FIXED_TYPES, empty: 'No hay flujos fijos (GFM / IFM).' },
+  {
+    value: 'variable',
+    label: 'Variables',
+    matches: ({ flow, schedule }) => VARIABLE_TYPES.includes(flow.flow_type) && !schedule.ended,
+    empty: 'No hay movimientos variables (GVM / IVM).',
+  },
+  {
+    value: 'fixed',
+    label: 'Fijos',
+    matches: ({ flow, schedule }) => FIXED_TYPES.includes(flow.flow_type) && !schedule.ended,
+    empty: 'No hay flujos fijos (GFM / IFM) en curso.',
+  },
+  {
+    value: 'ended',
+    label: 'Terminados',
+    matches: ({ schedule }) => schedule.ended,
+    empty: 'Ningún flujo ha terminado todavía. Aquí irán los que ya hayan hecho su último pago o cobro.',
+  },
 ]
 
-/** Historial de todos los flujos, con filtro por variables o fijos. Solo se muestra en PC. */
+/** Historial de los flujos: variables, fijos y, aparte, los ya terminados. Solo se muestra en PC. */
 export function HistoryTable({ onEdit, className }) {
   const { version, refresh } = useFinanceData()
   const { data: allFlows, error, loading } = useApiQuery(() => api.listFlows(), [version])
-  const [filterValue, setFilterValue] = useState('all')
+  const [filterValue, setFilterValue] = useState('variable')
   const filter = FILTERS.find((f) => f.value === filterValue)
-  const flows = allFlows && (filter.types ? allFlows.filter((f) => filter.types.includes(f.flow_type)) : allFlows)
+  const rows = allFlows?.map((flow) => ({ flow, schedule: describeSchedule(flow) })).filter(filter.matches)
   const [toDelete, setToDelete] = useState(null)
   const [deleteError, setDeleteError] = useState(null)
 
@@ -63,9 +79,19 @@ export function HistoryTable({ onEdit, className }) {
             value={filterValue}
             onValueChange={(next) => next && setFilterValue(next)}
             aria-label="Filtrar el historial"
+            className="shadow-none"
           >
             {FILTERS.map((f) => (
-              <ToggleGroupItem key={f.value} value={f.value} className="px-3 text-xs">
+              <ToggleGroupItem
+                key={f.value}
+                value={f.value}
+                className={cn(
+                  'px-3 text-xs shadow-xs',
+                  // «Fijos» cierra el bloque principal y «Terminados» queda un poco aparte.
+                  f.value === 'fixed' && 'rounded-r-md',
+                  f.value === 'ended' && 'ml-2 rounded-md data-[variant=outline]:border-l',
+                )}
+              >
                 {f.label}
               </ToggleGroupItem>
             ))}
@@ -78,12 +104,12 @@ export function HistoryTable({ onEdit, className }) {
             {deleteError ?? error.message}
           </p>
         )}
-        {flows && flows.length === 0 ? (
+        {rows && rows.length === 0 ? (
           <p className="text-muted-foreground py-8 text-center text-sm">
             {filter.empty}
           </p>
         ) : (
-          flows && (
+          rows && (
             <Table>
               <TableHeader>
                 <TableRow>
@@ -98,9 +124,8 @@ export function HistoryTable({ onEdit, className }) {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {flows.map((flow) => {
+                {rows.map(({ flow, schedule }) => {
                   const income = FLOW_TYPES[flow.flow_type].income
-                  const schedule = describeSchedule(flow)
                   return (
                     <TableRow key={flow.id}>
                       <TableCell className="text-muted-foreground">{formatDate(flow.start_date)}</TableCell>
