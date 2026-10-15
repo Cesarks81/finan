@@ -1,8 +1,9 @@
 import { useState } from 'react'
-import { Check, LoaderCircle, LogOut } from 'lucide-react'
+import { Check, LoaderCircle, LogOut, RotateCcw } from 'lucide-react'
 
 import { api } from '@/api/client'
 import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -155,6 +156,113 @@ function InitialBalanceSetting() {
   return <InitialBalanceForm settings={data} />
 }
 
+// Grupos que se pueden restablecer, cada uno con sus dos tipos de flujo.
+const RESET_GROUPS = [
+  { key: 'expenses', label: 'Gastos', detail: 'GFM y GVM', types: ['GFM', 'GVM'] },
+  { key: 'incomes', label: 'Ingresos', detail: 'IFM e IVM', types: ['IFM', 'IVM'] },
+]
+
+const flowCount = (n) => `${n} ${n === 1 ? 'flujo' : 'flujos'}`
+
+/** Borra de golpe todos los gastos, los ingresos o ambos, tras marcarlos y confirmar. */
+function ResetSetting() {
+  const { flows, refresh } = useFinanceData()
+  const [selected, setSelected] = useState({ expenses: false, incomes: false })
+  const [confirming, setConfirming] = useState(false)
+  const [status, setStatus] = useState(null) // null | 'deleting' | { deleted }
+  const [error, setError] = useState(null)
+
+  const countOf = (group) => (flows.data ?? []).filter((f) => group.types.includes(f.flow_type)).length
+  const chosen = RESET_GROUPS.filter((group) => selected[group.key])
+  const total = chosen.reduce((sum, group) => sum + countOf(group), 0)
+  const what = chosen.map((group) => group.label.toLowerCase()).join(' e ')
+
+  function toggle(key, checked) {
+    setSelected((current) => ({ ...current, [key]: checked === true }))
+    setConfirming(false)
+    setStatus(null)
+  }
+
+  async function handleReset() {
+    setStatus('deleting')
+    setError(null)
+    try {
+      const { deleted } = await api.deleteFlows(chosen.flatMap((group) => group.types))
+      refresh()
+      setSelected({ expenses: false, incomes: false })
+      setConfirming(false)
+      setStatus({ deleted })
+    } catch (err) {
+      setError(err.message)
+      setStatus(null)
+    }
+  }
+
+  return (
+    <div className="grid gap-3">
+      <div className="grid gap-2 rounded-lg border p-3">
+        {RESET_GROUPS.map((group) => (
+          <div key={group.key} className="flex items-center gap-3">
+            <Checkbox
+              id={`reset-${group.key}`}
+              checked={selected[group.key]}
+              onCheckedChange={(checked) => toggle(group.key, checked)}
+              disabled={status === 'deleting'}
+            />
+            <Label htmlFor={`reset-${group.key}`} className="flex-1 justify-between gap-3">
+              <span>
+                {group.label} <span className="text-muted-foreground font-normal">({group.detail})</span>
+              </span>
+              <span className="text-muted-foreground text-xs font-normal">{flowCount(countOf(group))}</span>
+            </Label>
+          </div>
+        ))}
+      </div>
+
+      {error && (
+        <p role="alert" className="text-destructive text-sm">
+          {error}
+        </p>
+      )}
+
+      {confirming ? (
+        <div className="border-destructive/40 grid gap-3 rounded-lg border p-3">
+          <p className="text-sm">
+            ¿Eliminar {total === 1 ? 'el único flujo' : `los ${total} flujos`} de {what}? La gráfica se recalculará sin{' '}
+            {total === 1 ? 'él' : 'ellos'}. No se puede deshacer.
+          </p>
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <Button variant="outline" onClick={() => setConfirming(false)} disabled={status === 'deleting'}>
+              No, cancelar
+            </Button>
+            <Button variant="destructive" onClick={handleReset} disabled={status === 'deleting'}>
+              {status === 'deleting' && <LoaderCircle className="animate-spin" />}
+              Sí, restablecer
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <div className="flex items-center justify-end gap-3">
+          {status?.deleted !== undefined && (
+            <p role="status" className="text-income flex items-center gap-1 text-sm">
+              <Check className="size-4" /> {flowCount(status.deleted)} {status.deleted === 1 ? 'eliminado' : 'eliminados'}
+            </p>
+          )}
+          <Button
+            variant="outline"
+            onClick={() => setConfirming(true)}
+            disabled={total === 0}
+            className="text-destructive hover:text-destructive"
+          >
+            <RotateCcw />
+            Restablecer…
+          </Button>
+        </div>
+      )}
+    </div>
+  )
+}
+
 function SessionSetting() {
   const { logout } = useAuth()
   return (
@@ -165,7 +273,7 @@ function SessionSetting() {
   )
 }
 
-/** Modal de ajustes (engranaje del encabezado): tema, tipo de gráfica, patrimonio inicial y sesión. */
+/** Modal de ajustes (engranaje del encabezado): tema, gráfica, patrimonio inicial, restablecer datos y sesión. */
 export function SettingsDialog({ open, onOpenChange }) {
   const { required: hasSession } = useAuth()
   return (
@@ -173,7 +281,7 @@ export function SettingsDialog({ open, onOpenChange }) {
       <DialogContent className="gap-6">
         <DialogHeader>
           <DialogTitle>Ajustes</DialogTitle>
-          <DialogDescription className="sr-only">Apariencia, gráfica, patrimonio inicial y sesión</DialogDescription>
+          <DialogDescription className="sr-only">Apariencia, gráfica, patrimonio inicial, restablecer datos y sesión</DialogDescription>
         </DialogHeader>
 
         <Section title="Apariencia">
@@ -189,6 +297,13 @@ export function SettingsDialog({ open, onOpenChange }) {
           description="Tu patrimonio neto (ahorros menos deudas) en una fecha, normalmente hoy. La gráfica parte de ese valor: suma o resta los flujos desde esa fecha y reconstruye hacia atrás los anteriores. Puede ser negativo."
         >
           <InitialBalanceSetting />
+        </Section>
+
+        <Section
+          title="Restablecer datos"
+          description="Elimina de golpe todos los gastos, todos los ingresos o ambos. El patrimonio inicial se mantiene."
+        >
+          <ResetSetting />
         </Section>
 
         {hasSession && (
