@@ -24,14 +24,10 @@ import {
   formatEURCompact,
   formatMonthYear,
   formatMonths,
-  formatPercent,
-  formatPercentSigned,
-  formatPointsSigned,
   formatPeriod,
 } from '@/lib/format'
 import { goalForecast } from '@/lib/goal'
-import { wealthMetrics } from '@/lib/metrics'
-import { savingsTrend } from '@/lib/savingsStats'
+import { cushionMonths } from '@/lib/metrics'
 import { cn } from '@/lib/utils'
 
 const axisTick = { fill: 'var(--muted-foreground)', fontSize: 12 }
@@ -129,13 +125,6 @@ function toChartPoints(apiPoints) {
   })
 }
 
-// Lo que se muestra como «0,0» (menos de 0,05 puntos) va en gris, no en verde ni en rojo.
-function toneOf(value) {
-  if (value > 0.0005) return 'text-income'
-  if (value < -0.0005) return 'text-expense'
-  return 'text-muted-foreground'
-}
-
 // Colchón: por debajo de 3 meses de gastos fijos es poco (rojo); desde 6, suficiente (verde).
 function cushionTone(months) {
   if (months < 3) return 'text-expense'
@@ -144,42 +133,16 @@ function cushionTone(months) {
 }
 
 /**
- * Línea discreta con las métricas del mes (`wealthMetrics`: colchón y tasa de ahorro) y la
- * evolución del ahorro (`savingsTrend`): en móvil bajo el título; en PC arriba a la derecha, a la
- * altura del título. `unit` es el periodo comparado («mes» o «año»). Cada pareja va junta: si no
- * cabe todo en una línea, salta a la siguiente entera.
+ * Colchón (`cushionMonths`), discreto: en móvil bajo el título; en PC arriba a la derecha, a la
+ * altura del título.
  */
-function ChartSummary({ stats, metrics, unit, className }) {
+function ChartSummary({ cushion, className }) {
   return (
-    <CardDescription className={cn('flex flex-wrap gap-x-3 gap-y-0.5 text-xs', className)}>
-      {metrics && (
-        <span className="flex gap-x-3 whitespace-nowrap">
-          <span title="Meses de gastos fijos (GFM) que cubre tu patrimonio de hoy">
-            Colchón{' '}
-            <span className={cn('font-medium tabular-nums', metrics.cushion !== null && cushionTone(metrics.cushion))}>
-              {metrics.cushion === null ? '—' : formatMonths(metrics.cushion)}
-            </span>
-          </span>
-          <span title="Parte de los ingresos de este mes que te queda tras todos los gastos">
-            Tasa de ahorro{' '}
-            <span className={cn('font-medium tabular-nums', metrics.savingsRate !== null && toneOf(metrics.savingsRate))}>
-              {metrics.savingsRate === null ? '—' : formatPercent(metrics.savingsRate)}
-            </span>
-          </span>
-        </span>
-      )}
-      <span className="flex gap-x-3 whitespace-nowrap">
-        <span title={`Media de cuánto cambia lo que ahorras (ingresos − gastos) de un ${unit} al siguiente`}>
-          Media de ahorro{' '}
-          <span className={cn('font-medium tabular-nums', toneOf(stats.average))}>
-            {stats.average === null ? '—' : formatPercentSigned(stats.average)}
-          </span>
-        </span>
-        <span title={`Si ese cambio se acelera (+) o se frena (−) de un ${unit} al siguiente, en puntos porcentuales`}>
-          Tendencia{' '}
-          <span className={cn('font-medium tabular-nums', toneOf(stats.trend))}>
-            {stats.trend === null ? '—' : formatPointsSigned(stats.trend)}
-          </span>
+    <CardDescription className={cn('text-xs', className)}>
+      <span title="Meses de gastos fijos (GFM) que cubre tu patrimonio de hoy">
+        Colchón{' '}
+        <span className={cn('font-medium tabular-nums', cushion !== null && cushionTone(cushion))}>
+          {cushion === null ? '—' : formatMonths(cushion)}
         </span>
       </span>
     </CardDescription>
@@ -382,16 +345,9 @@ export function NetWorthChart({ className }) {
 
   const points = useMemo(() => toChartPoints(data?.points ?? []), [data])
   const layers = useMemo(() => splitLayers(points), [points])
-  // El ahorro se compara mes a mes (en D también: día a día casi siempre es 0 € y el % no dice
-  // nada) y, en la vista A, año a año. Sale de las vistas M y A ya en caché.
-  const statsSource = granularity === 'A' ? projections.data?.A : projections.data?.M
-  const stats = useMemo(() => (statsSource ? savingsTrend(statsSource.points) : null), [statsSource])
-  const statsUnit = granularity === 'A' ? 'año' : 'mes'
   const todayBalance = projections.data?.todayBalance
-  const metrics = useMemo(
-    () => (flows.data && todayBalance !== undefined ? wealthMetrics(flows.data, todayBalance) : null),
-    [flows.data, todayBalance],
-  )
+  const ready = Boolean(flows.data) && todayBalance !== undefined
+  const cushion = useMemo(() => (ready ? cushionMonths(flows.data, todayBalance) : null), [ready, flows.data, todayBalance])
 
   useEffect(() => {
     if (!plotRef.current || !points.length) return undefined
@@ -454,13 +410,11 @@ export function NetWorthChart({ className }) {
             )}
           />
         </CardTitle>
-        {stats && !isDesktop && <ChartSummary stats={stats} metrics={metrics} unit={statsUnit} />}
-        {((stats && isDesktop) || splitLines) && (
+        {ready && !isDesktop && <ChartSummary cushion={cushion} />}
+        {((ready && isDesktop) || splitLines) && (
           // PC: el resumen a la altura del título y, debajo, la leyenda. Móvil: solo la leyenda.
           <CardAction className="flex flex-col items-end gap-1.5">
-            {stats && isDesktop && (
-              <ChartSummary stats={stats} metrics={metrics} unit={statsUnit} className="min-h-5 items-center justify-end" />
-            )}
+            {ready && isDesktop && <ChartSummary cushion={cushion} className="flex min-h-5 items-center justify-end" />}
             {splitLines && (
               <div className="flex gap-3 text-xs">
                 {SPLIT_SERIES.map((series) => (

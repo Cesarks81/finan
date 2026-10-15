@@ -5,36 +5,18 @@ const fullDate = new Intl.DateTimeFormat('es-ES', { day: 'numeric', month: 'shor
 const monthShort = new Intl.DateTimeFormat('es-ES', { month: 'short', year: '2-digit' })
 const monthLong = new Intl.DateTimeFormat('es-ES', { month: 'long', year: 'numeric' })
 
-const percentSigned = new Intl.NumberFormat('es-ES', {
-  style: 'percent',
-  minimumFractionDigits: 1,
-  maximumFractionDigits: 1,
-  signDisplay: 'exceptZero',
-})
-
 export const formatEUR = (value) => eur.format(Number(value))
 const eurWhole = new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 })
 /** Importe redondeado al euro, para cifras de un vistazo: «140 €». */
 export const formatEURWhole = (value) => eurWhole.format(Number(value))
-const pointsSigned = new Intl.NumberFormat('es-ES', {
-  minimumFractionDigits: 1,
-  maximumFractionDigits: 1,
-  signDisplay: 'exceptZero',
-})
 
-/** Diferencia entre dos proporciones (0,278) en puntos porcentuales: «+27,8 p.p.». */
-export const formatPointsSigned = (ratio) => `${pointsSigned.format(ratio * 100)} p.p.`
-/** Proporción (0,132) como porcentaje con signo: «+13,2 %». */
-export const formatPercentSigned = (ratio) => percentSigned.format(ratio)
-const percentWhole = new Intl.NumberFormat('es-ES', { style: 'percent', maximumFractionDigits: 0 })
-/** Proporción (0,25) como porcentaje redondeado: «25 %». */
-export const formatPercent = (ratio) => percentWhole.format(ratio)
 const monthsCount = new Intl.NumberFormat('es-ES', { maximumFractionDigits: 1 })
 /** Número de meses: «6,1 meses», «1 mes»; desde 10, sin decimales («14 meses»). */
 export function formatMonths(value) {
   const rounded = value >= 10 ? Math.round(value) : Math.round(value * 10) / 10
   return `${monthsCount.format(rounded)} ${rounded === 1 ? 'mes' : 'meses'}`
 }
+
 /** Importe abreviado para los ejes, con K y M en vez de «mil» y «M»: «500 €», «12,5K €», «1,2M €». */
 export function formatEURCompact(value) {
   const amount = Number(value)
