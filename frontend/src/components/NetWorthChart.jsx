@@ -26,6 +26,19 @@ import {
 import { cn } from '@/lib/utils'
 
 const axisTick = { fill: 'var(--muted-foreground)', fontSize: 12 }
+// Móvil: ejes discretos. Las fechas, pequeñas debajo; los importes, dentro de la gráfica a la
+// izquierda (`mirror`), tenues y justo encima de su línea guía, alineados con el margen de la página.
+
+/** Fecha del eje X en móvil: las de los extremos se alinean hacia dentro para no cortarse. */
+function MobileXTick({ x, y, payload, width, index, tickFormatter }) {
+  const anchor = x < 24 ? 'start' : x > Number(width) - 24 ? 'end' : 'middle'
+  return (
+    <text x={x} y={y} dy="0.71em" textAnchor={anchor} fill="var(--muted-foreground)" fontSize={10}>
+      {tickFormatter ? tickFormatter(payload.value, index) : payload.value}
+    </text>
+  )
+}
+const mobileYTick = { fill: 'var(--muted-foreground)', fillOpacity: 0.7, fontSize: 10, dx: 8, dy: -6 }
 
 // El máximo visible queda hacia el 45 % de la altura, así la curva no se pega al borde
 // superior y queda aire limpio por encima.
@@ -223,7 +236,8 @@ function ChartTooltip({ active, payload, granularity, splitLines }) {
 
 /**
  * Gráfica de patrimonio con el selector D/M/A integrado abajo a la derecha. En móvil ocupa
- * todo el ancho, sin tarjeta ni ejes; en PC va en tarjeta, con ejes y rejilla.
+ * todo el ancho, sin tarjeta y con ejes discretos (los importes, dentro de la gráfica); en PC va
+ * en tarjeta, con ejes y rejilla.
  * Con el ajuste «Ingresos y gastos por separado» muestra en su lugar dos líneas: ingresos
  * (azul) y gastos (rojo) acumulados desde el inicio de la vista. Con «Vista de calendario»,
  * las ventanas son el mes y el año en curso (ver `lib/projections.js`).
@@ -242,6 +256,8 @@ export function NetWorthChart({ className }) {
   const layers = useMemo(() => splitLayers(points), [points])
   const stats = useMemo(() => summarize(points), [points])
   const hasNegative = !splitLines && points.some((p) => p.balance < 0)
+  // Solo en la vista de patrimonio y si se ha indicado un patrimonio inicial (con su fecha).
+  const initialBalance = !splitLines && data?.balance_date ? Number(data.initial_balance) : null
   const scale = useMemo(
     () =>
       yScale(splitLines ? points.flatMap((p) => [p.incomeTotal, p.expenseTotal]) : points.map((p) => p.balance)),
@@ -314,26 +330,31 @@ export function NetWorthChart({ className }) {
                       </linearGradient>
                     ))}
                   </defs>
-                  {isDesktop && <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="var(--border)" />}
+                  <CartesianGrid
+                    vertical={false}
+                    strokeDasharray="3 3"
+                    stroke="var(--border)"
+                    strokeOpacity={isDesktop ? 1 : 0.6}
+                  />
                   <XAxis
-                    hide={!isDesktop}
                     dataKey="period"
                     tickFormatter={(p) => formatPeriod(p, granularity)}
-                    tick={axisTick}
+                    tick={isDesktop ? axisTick : MobileXTick}
                     tickLine={false}
                     axisLine={false}
-                    minTickGap={24}
+                    minTickGap={isDesktop ? 24 : 32}
+                    height={isDesktop ? 30 : 20}
                     // En la vista de calendario (12 meses, 25 años…) el reparto por defecto deja huecos
                     // desiguales: ahí se reparten las etiquetas por igual desde la primera.
                     interval={calendar ? 'equidistantPreserveStart' : 'preserveEnd'}
-                    tickMargin={8}
+                    tickMargin={isDesktop ? 8 : 4}
                   />
                   <YAxis
-                    hide={!isDesktop}
+                    mirror={!isDesktop}
                     domain={scale.domain}
                     ticks={scale.ticks}
                     tickFormatter={formatEURCompact}
-                    tick={axisTick}
+                    tick={isDesktop ? axisTick : mobileYTick}
                     tickLine={false}
                     axisLine={false}
                     width={72}
@@ -343,6 +364,22 @@ export function NetWorthChart({ className }) {
                     cursor={{ stroke: 'var(--muted-foreground)', strokeDasharray: '3 3' }}
                   />
                   {hasNegative && <ReferenceLine y={0} stroke="var(--expense)" strokeOpacity={0.5} />}
+                  {initialBalance !== null && (
+                    // Patrimonio inicial de Ajustes: línea horizontal muy tenue (solo si cae en la vista).
+                    <ReferenceLine
+                      y={initialBalance}
+                      stroke="var(--muted-foreground)"
+                      strokeOpacity={0.45}
+                      strokeDasharray="2 4"
+                      label={{
+                        value: 'Inicial',
+                        position: 'insideTopRight',
+                        fill: 'var(--muted-foreground)',
+                        fillOpacity: 0.8,
+                        fontSize: 10,
+                      }}
+                    />
+                  )}
                   <ReferenceLine
                     x={currentPeriod(granularity)}
                     stroke="var(--muted-foreground)"
@@ -378,11 +415,11 @@ export function NetWorthChart({ className }) {
               </ResponsiveContainer>
             )
           )}
-          {/* En PC queda justo encima de las etiquetas del eje X. */}
+          {/* Justo encima de las etiquetas del eje X. */}
           <GranularitySelector
             value={granularity}
             onChange={setGranularity}
-            className="absolute right-4 bottom-2 md:right-3 md:bottom-9"
+            className="absolute right-4 bottom-7 md:right-3 md:bottom-9"
           />
         </div>
       </CardContent>
