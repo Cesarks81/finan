@@ -14,7 +14,7 @@ export function investmentOf(settings) {
   }
 }
 
-// Aportaciones hechas hasta `iso`: una el día 1 de cada mes desde el siguiente a `date`.
+// Aportaciones hasta `iso`: una el día 1 de cada mes desde el siguiente a `date`.
 function contributionsUntil(date, iso) {
   const [y0, m0] = date.split('-').map(Number)
   const [y, m] = iso.split('-').map(Number)
@@ -22,37 +22,56 @@ function contributionsUntil(date, iso) {
 }
 
 /**
- * Calculadora del valor de la inversión: lo invertido en `date` y las aportaciones de cada mes
- * (el día 1), cada una con interés compuesto desde que entra. Llevadas todas a la fecha `date`, el
- * valor en `iso` es (1 + r)^años · (invertido + aportación · Σ descuentos), así que basta con ir
- * acumulando los descuentos de cada aportación una sola vez (miles de puntos en milisegundos).
+ * Lo que sobra cada mes ('YYYY-MM' → ingresos − gastos), sacado de las proyecciones mensuales
+ * de la API (la vista M y la larga), antes de rentabilidad e inflación.
  */
-function valueCalculator({ amount, monthly, rate, date }) {
+export function monthlySurplus(projections) {
+  const surplus = new Map()
+  for (const p of [...(projections?.M?.points ?? []), ...(projections?.long ?? [])]) {
+    surplus.set(p.period.slice(0, 7), Number(p.income) - Number(p.expense))
+  }
+  return surplus
+}
+
+/**
+ * Calculadora de la inversión: lo invertido en `date` y una aportación el día 1 de cada mes,
+ * cada una con interés compuesto desde que entra. Nunca se invierte más de lo que sobra ese mes
+ * (`surplus`): la aportación es la mensual o, si sobra menos, lo que sobre (0 si no sobra nada);
+ * un mes sin datos lleva la mensual. Llevadas todas a la fecha `date`, el valor en `iso` es
+ * (1 + r)^años · (invertido + Σ aportación · descuento), así que basta con acumular cada
+ * aportación una sola vez (miles de puntos en milisegundos). Devuelve `{ value, contributed }`.
+ */
+function calculator({ amount, monthly, rate, date }, surplus = new Map()) {
   const start = parseISODate(date)
-  const discounts = [0] // discounts[n]: suma de (1 + r)^−años(date, aportación k) para k ≤ n
+  const discounted = [0] // discounted[n]: Σ aportación k · (1 + r)^−años(date, k), k ≤ n
+  const contributed = [0] // contributed[n]: Σ aportación k, k ≤ n
   return (iso) => {
-    if (iso <= date) return amount
+    if (iso <= date) return { value: amount, contributed: 0 }
     const n = contributionsUntil(date, iso)
-    for (let k = discounts.length; k <= n; k++) {
+    for (let k = discounted.length; k <= n; k++) {
       const when = toISODate(new Date(start.getFullYear(), start.getMonth() + k, 1))
-      discounts.push(discounts[k - 1] + (1 + rate) ** -years(date, when))
+      const free = surplus.get(when.slice(0, 7))
+      const contribution = free === undefined ? monthly : Math.min(monthly, Math.max(0, free))
+      discounted.push(discounted[k - 1] + contribution * (1 + rate) ** -years(date, when))
+      contributed.push(contributed[k - 1] + contribution)
     }
-    return (1 + rate) ** years(date, iso) * (amount + monthly * discounts[n])
+    return { value: (1 + rate) ** years(date, iso) * (amount + discounted[n]), contributed: contributed[n] }
   }
 }
 
 /** Valor de la inversión en `iso` (antes de `date`, lo invertido entonces). */
-export function investmentValue(investment, iso) {
-  return valueCalculator(investment)(iso)
+export function investmentValue(investment, iso, surplus) {
+  return calculator(investment, surplus)(iso).value
 }
 
 /** Rentabilidad acumulada desde `date` hasta `iso`: el valor menos lo que se ha puesto. */
-function gainsCalculator(investment) {
-  const value = valueCalculator(investment)
-  return (iso) =>
-    iso <= investment.date
-      ? 0
-      : value(iso) - investment.amount - investment.monthly * contributionsUntil(investment.date, iso)
+function gainsCalculator(investment, surplus) {
+  const at = calculator(investment, surplus)
+  return (iso) => {
+    if (iso <= investment.date) return 0
+    const { value, contributed } = at(iso)
+    return value - investment.amount - contributed
+  }
 }
 
 /**
@@ -60,11 +79,12 @@ function gainsCalculator(investment) {
  * parte del patrimonio (aportar es mover dinero ahorrado, no gastarlo), así que solo se suma lo
  * que rinden. El patrimonio inicial ya incluye lo ganado hasta su fecha (`balance_date`): como con
  * los flujos, se suma lo que rinde desde entonces y, antes de esa fecha, se resta lo que faltaba
- * por rendir. Las líneas de ingresos y gastos no cambian.
+ * por rendir. Las líneas de ingresos y gastos no cambian. `projections` son las de la API (de
+ * ellas sale lo que sobra cada mes, el tope de cada aportación).
  */
 export function withInvestment(projections, investment, balanceDate, today = new Date()) {
   if (!investment) return projections
-  const gains = gainsCalculator(investment)
+  const gains = gainsCalculator(investment, monthlySurplus(projections))
   const anchor = balanceDate && balanceDate > investment.date ? balanceDate : investment.date
   const base = gains(anchor)
   const adjust = (iso) => gains(iso) - base
