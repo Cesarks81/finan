@@ -47,7 +47,9 @@ function PortfolioValue() {
  */
 export function Dashboard() {
   const [dialog, setDialog] = useState({ open: false, flow: null, type: 'GVM', key: 0 })
-  const [settingsOpen, setSettingsOpen] = useState(false)
+  // Ajustes: `page` abre directamente una de sus pantallas (p. ej. el objetivo).
+  const [settings, setSettings] = useState({ open: false, page: null, key: 0 })
+  const openSettings = (page = null) => setSettings((current) => ({ open: true, page, key: current.key + 1 }))
   const [review, setReview] = useState({ open: false, key: 0 })
   const monthlyReview = useMonthlyReview()
   const openReview = () => setReview((current) => ({ open: true, key: current.key + 1 }))
@@ -81,7 +83,7 @@ export function Dashboard() {
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => setSettingsOpen(true)}
+            onClick={() => openSettings()}
             aria-label="Ajustes"
             title="Ajustes"
             className="absolute top-1/2 right-0 -translate-y-1/2 md:static md:translate-y-0"
@@ -120,7 +122,7 @@ export function Dashboard() {
         {isDesktop && (
           <div className="flex flex-col gap-3 md:col-start-2 md:row-start-2 md:self-start">
             {monthlyReview.pending && <ReviewReminder card onOpen={openReview} />}
-            <GoalCard onEdit={() => setSettingsOpen(true)} />
+            <GoalCard onEdit={() => openSettings('goal')} />
           </div>
         )}
       </main>
@@ -132,7 +134,12 @@ export function Dashboard() {
         defaultType={dialog.type}
         formKey={dialog.key}
       />
-      <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
+      <SettingsDialog
+        open={settings.open}
+        onOpenChange={(open) => setSettings((current) => ({ ...current, open }))}
+        page={settings.page}
+        formKey={settings.key}
+      />
       <ReviewDialog
         open={review.open}
         onOpenChange={(open) => setReview((current) => ({ ...current, open }))}
