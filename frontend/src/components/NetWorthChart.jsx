@@ -23,11 +23,14 @@ import {
   formatEUR,
   formatEURCompact,
   formatMonthYear,
+  formatMonths,
+  formatPercent,
   formatPercentSigned,
   formatPointsSigned,
   formatPeriod,
 } from '@/lib/format'
 import { goalForecast } from '@/lib/goal'
+import { wealthMetrics } from '@/lib/metrics'
 import { savingsTrend } from '@/lib/savingsStats'
 import { cn } from '@/lib/utils'
 
@@ -133,23 +136,50 @@ function toneOf(value) {
   return 'text-muted-foreground'
 }
 
+// Colchón: por debajo de 3 meses de gastos fijos es poco (rojo); desde 6, suficiente (verde).
+function cushionTone(months) {
+  if (months < 3) return 'text-expense'
+  if (months >= 6) return 'text-income'
+  return 'text-foreground'
+}
+
 /**
- * Línea discreta con la evolución del ahorro (`savingsTrend`): en móvil bajo el título; en PC
- * arriba a la derecha, a la altura del título. `unit` es el periodo comparado («mes» o «año»).
+ * Línea discreta con las métricas del mes (`wealthMetrics`: colchón y tasa de ahorro) y la
+ * evolución del ahorro (`savingsTrend`): en móvil bajo el título; en PC arriba a la derecha, a la
+ * altura del título. `unit` es el periodo comparado («mes» o «año»). Cada pareja va junta: si no
+ * cabe todo en una línea, salta a la siguiente entera.
  */
-function ChartSummary({ stats, unit, className }) {
+function ChartSummary({ stats, metrics, unit, className }) {
   return (
     <CardDescription className={cn('flex flex-wrap gap-x-3 gap-y-0.5 text-xs', className)}>
-      <span title={`Media de cuánto cambia lo que ahorras (ingresos − gastos) de un ${unit} al siguiente`}>
-        Media de ahorro{' '}
-        <span className={cn('font-medium tabular-nums', toneOf(stats.average))}>
-          {stats.average === null ? '—' : formatPercentSigned(stats.average)}
+      {metrics && (
+        <span className="flex gap-x-3 whitespace-nowrap">
+          <span title="Meses de gastos fijos (GFM) que cubre tu patrimonio de hoy">
+            Colchón{' '}
+            <span className={cn('font-medium tabular-nums', metrics.cushion !== null && cushionTone(metrics.cushion))}>
+              {metrics.cushion === null ? '—' : formatMonths(metrics.cushion)}
+            </span>
+          </span>
+          <span title="Parte de los ingresos de este mes que te queda tras todos los gastos">
+            Tasa de ahorro{' '}
+            <span className={cn('font-medium tabular-nums', metrics.savingsRate !== null && toneOf(metrics.savingsRate))}>
+              {metrics.savingsRate === null ? '—' : formatPercent(metrics.savingsRate)}
+            </span>
+          </span>
         </span>
-      </span>
-      <span title={`Si ese cambio se acelera (+) o se frena (−) de un ${unit} al siguiente, en puntos porcentuales`}>
-        Tendencia{' '}
-        <span className={cn('font-medium tabular-nums', toneOf(stats.trend))}>
-          {stats.trend === null ? '—' : formatPointsSigned(stats.trend)}
+      )}
+      <span className="flex gap-x-3 whitespace-nowrap">
+        <span title={`Media de cuánto cambia lo que ahorras (ingresos − gastos) de un ${unit} al siguiente`}>
+          Media de ahorro{' '}
+          <span className={cn('font-medium tabular-nums', toneOf(stats.average))}>
+            {stats.average === null ? '—' : formatPercentSigned(stats.average)}
+          </span>
+        </span>
+        <span title={`Si ese cambio se acelera (+) o se frena (−) de un ${unit} al siguiente, en puntos porcentuales`}>
+          Tendencia{' '}
+          <span className={cn('font-medium tabular-nums', toneOf(stats.trend))}>
+            {stats.trend === null ? '—' : formatPointsSigned(stats.trend)}
+          </span>
         </span>
       </span>
     </CardDescription>
@@ -345,7 +375,7 @@ export function NetWorthChart({ className }) {
     delete plotRef.current?.dataset.drawing
   }, [])
   // Las tres vistas ya están en memoria: cambiar de una a otra no hace peticiones.
-  const { projections, chart, settings } = useFinanceData()
+  const { projections, chart, settings, flows } = useFinanceData()
   const { splitLines, calendar } = chart
   const { error, loading } = projections
   const data = projections.data?.[granularity]
@@ -357,6 +387,11 @@ export function NetWorthChart({ className }) {
   const statsSource = granularity === 'A' ? projections.data?.A : projections.data?.M
   const stats = useMemo(() => (statsSource ? savingsTrend(statsSource.points) : null), [statsSource])
   const statsUnit = granularity === 'A' ? 'año' : 'mes'
+  const todayBalance = projections.data?.todayBalance
+  const metrics = useMemo(
+    () => (flows.data && todayBalance !== undefined ? wealthMetrics(flows.data, todayBalance) : null),
+    [flows.data, todayBalance],
+  )
 
   useEffect(() => {
     if (!plotRef.current || !points.length) return undefined
@@ -419,12 +454,12 @@ export function NetWorthChart({ className }) {
             )}
           />
         </CardTitle>
-        {stats && !isDesktop && <ChartSummary stats={stats} unit={statsUnit} />}
+        {stats && !isDesktop && <ChartSummary stats={stats} metrics={metrics} unit={statsUnit} />}
         {((stats && isDesktop) || splitLines) && (
           // PC: el resumen a la altura del título y, debajo, la leyenda. Móvil: solo la leyenda.
           <CardAction className="flex flex-col items-end gap-1.5">
             {stats && isDesktop && (
-              <ChartSummary stats={stats} unit={statsUnit} className="min-h-5 items-center justify-end" />
+              <ChartSummary stats={stats} metrics={metrics} unit={statsUnit} className="min-h-5 items-center justify-end" />
             )}
             {splitLines && (
               <div className="flex gap-3 text-xs">
