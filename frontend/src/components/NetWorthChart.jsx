@@ -162,27 +162,31 @@ function ChartSummary({ stats, unit, className }) {
  * al levantarlo, que el ratón ha salido (se quita la información, la línea y el punto), y se
  * cancelan los eventos de ratón de después. Solo dentro de la gráfica: el selector D M A sigue
  * recibiendo sus toques.
+ *
+ * El aviso de levantar el dedo se escucha en el propio elemento tocado: si es el relleno de un
+ * área, Recharts lo vuelve a dibujar al tocarlo y lo saca de la página, y entonces el evento ya
+ * no llega a los elementos de alrededor (sí al tocado, que siempre lo recibe).
  */
-function chartUnderTouch(event) {
-  return event.target instanceof Element ? event.target.closest('.recharts-wrapper') : null
-}
-
-function showPointUnderFinger(event) {
-  const chart = chartUnderTouch(event)
+function trackTouchOnChart(event) {
+  const target = event.target
+  const chart = target instanceof Element ? target.closest('.recharts-wrapper') : null
   const touch = event.touches[0]
-  if (!chart || !touch) return
+  if (!chart || !touch || event.touches.length > 1) return
   chart.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, clientX: touch.clientX, clientY: touch.clientY }))
-}
 
-function hidePointOnRelease(event) {
-  const chart = chartUnderTouch(event)
-  if (!chart || event.touches.length > 0) return
-  if (event.cancelable) event.preventDefault()
-  // En el siguiente fotograma: Recharts aplica los movimientos en un requestAnimationFrame, y en
-  // un toque muy corto el del dedo llegaría después y dejaría el punto fijo.
-  requestAnimationFrame(() =>
-    chart.dispatchEvent(new MouseEvent('mouseout', { bubbles: true, relatedTarget: document.body })),
-  )
+  const release = (end) => {
+    if (end.touches.length > 0) return
+    target.removeEventListener('touchend', release)
+    target.removeEventListener('touchcancel', release)
+    if (end.cancelable) end.preventDefault()
+    // En el siguiente fotograma: Recharts aplica los movimientos en un requestAnimationFrame, y en
+    // un toque muy corto el del dedo llegaría después y dejaría el punto fijo.
+    requestAnimationFrame(() =>
+      chart.dispatchEvent(new MouseEvent('mouseout', { bubbles: true, relatedTarget: document.body })),
+    )
+  }
+  target.addEventListener('touchend', release, { passive: false })
+  target.addEventListener('touchcancel', release)
 }
 
 function TooltipRow({ label, children, className }) {
@@ -366,9 +370,7 @@ export function NetWorthChart({ className }) {
         {/* touch-none: al arrastrar el dedo por la gráfica solo se mueve el indicador, no la página. */}
         <div
           className="relative min-h-40 flex-1 touch-none md:h-80 md:flex-none"
-          onTouchStart={showPointUnderFinger}
-          onTouchEnd={hidePointOnRelease}
-          onTouchCancel={hidePointOnRelease}
+          onTouchStart={trackTouchOnChart}
         >
           {error ? (
             <div className="text-muted-foreground flex h-full items-center justify-center px-6 text-center text-sm">
@@ -433,20 +435,12 @@ export function NetWorthChart({ className }) {
                   />
                   {hasNegative && <ReferenceLine y={0} stroke="var(--expense)" strokeOpacity={0.5} />}
                   {initialBalance !== null && (
-                    // Patrimonio inicial de Ajustes: línea horizontal muy tenue (solo si cae en la vista).
+                    // Patrimonio inicial de Ajustes: línea horizontal muy tenue, sin etiqueta (solo si cae en la vista).
                     <ReferenceLine
                       y={initialBalance}
                       stroke="var(--muted-foreground)"
                       strokeOpacity={0.45}
                       strokeDasharray="2 4"
-                      label={{
-                        value: 'Inicial',
-                        // En PC, a la izquierda: a la derecha lo tapaba el selector D M A si la línea va baja.
-                        position: isDesktop ? 'insideTopLeft' : 'insideTopRight',
-                        fill: 'var(--muted-foreground)',
-                        fillOpacity: 0.8,
-                        fontSize: 10,
-                      }}
                     />
                   )}
                   <ReferenceLine
