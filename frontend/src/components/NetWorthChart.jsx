@@ -327,6 +327,21 @@ export function NetWorthChart({ className }) {
     }
   }, [])
   useEffect(() => () => clearTimeout(glideTimer.current), [])
+
+  // Mientras la línea se dibuja (al cargar, al cambiar de vista o de modo y cuando cambian los
+  // datos) la gráfica no responde al dedo ni al ratón: mostrar la información volvía a pintar la
+  // gráfica y la animación saltaba al final. Se marca en el DOM (`data-drawing`, ver index.css) y
+  // no con estado de React, porque volver a pintar en mitad de la animación es justo lo que la
+  // corta. No se usa el aviso de inicio de la animación de Recharts: también salta (sin cambio
+  // visible) cada vez que aparece la información, y bloquearía la gráfica sin motivo. Se libera
+  // al acabar la animación o, como mucho, a los 1,6 s (dura 1,5 s). El selector D M A está fuera
+  // y sigue funcionando.
+  const plotRef = useRef(null)
+  const drawingTimer = useRef(null)
+  const endDrawing = useCallback(() => {
+    clearTimeout(drawingTimer.current)
+    delete plotRef.current?.dataset.drawing
+  }, [])
   // Las tres vistas ya están en memoria: cambiar de una a otra no hace peticiones.
   const { projections, chart } = useFinanceData()
   const { splitLines, calendar } = chart
@@ -340,6 +355,14 @@ export function NetWorthChart({ className }) {
   const statsSource = granularity === 'A' ? projections.data?.A : projections.data?.M
   const stats = useMemo(() => (statsSource ? savingsTrend(statsSource.points) : null), [statsSource])
   const statsUnit = granularity === 'A' ? 'año' : 'mes'
+
+  useEffect(() => {
+    if (!plotRef.current || !points.length) return undefined
+    plotRef.current.dataset.drawing = ''
+    clearTimeout(drawingTimer.current)
+    drawingTimer.current = setTimeout(endDrawing, 1600)
+    return () => clearTimeout(drawingTimer.current)
+  }, [points, granularity, splitLines, calendar, endDrawing])
   const hasNegative = !splitLines && points.some((p) => p.balance < 0)
   // Solo en la vista de patrimonio y si se ha indicado un patrimonio inicial (con su fecha).
   const initialBalance = !splitLines && data?.balance_date ? Number(data.initial_balance) : null
@@ -396,6 +419,7 @@ export function NetWorthChart({ className }) {
       <CardContent className="flex min-h-0 flex-1 flex-col px-0 md:px-4">
         {/* touch-none: al arrastrar el dedo por la gráfica solo se mueve el indicador, no la página. */}
         <div
+          ref={plotRef}
           className="relative min-h-40 flex-1 touch-none md:h-80 md:flex-none"
           onTouchStart={trackTouchOnChart}
         >
@@ -489,6 +513,7 @@ export function NetWorthChart({ className }) {
                         strokeWidth={2}
                         fill={`url(#${gradientId}-${series.key})`}
                         activeDot={{ r: 4 }}
+                        onAnimationEnd={endDrawing}
                       />
                     ))
                   ) : (
@@ -500,6 +525,7 @@ export function NetWorthChart({ className }) {
                       strokeWidth={2}
                       fill={`url(#${gradientId}-balance)`}
                       activeDot={{ r: 4 }}
+                      onAnimationEnd={endDrawing}
                     />
                   )}
                 </AreaChart>
