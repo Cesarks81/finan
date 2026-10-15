@@ -63,8 +63,6 @@ class Settings(Base):
 
     `initial_balance` es el patrimonio neto al empezar `balance_date`, antes de los
     movimientos de ese día. Sin fecha, es el patrimonio previo a cualquier flujo.
-    `savings_target` es lo que el usuario quiere ahorrar cada mes (se aparta antes de calcular
-    lo disponible para gastos variables); sin él no se calcula ese disponible.
     `goal_name` y `goal_amount` son el objetivo de patrimonio (p. ej. «Entrada piso», 20.000 €).
     """
 
@@ -73,7 +71,6 @@ class Settings(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     initial_balance: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=Decimal(0))
     balance_date: Mapped[date | None] = mapped_column(Date, default=None)
-    savings_target: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), default=None)
     goal_name: Mapped[str | None] = mapped_column(String(60), default=None)
     goal_amount: Mapped[Decimal | None] = mapped_column(Numeric(14, 2), default=None)
     updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
