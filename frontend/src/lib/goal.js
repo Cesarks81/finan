@@ -12,7 +12,10 @@ const cents = (value) => Math.round(Number(value) * 100)
 function firstMonthReaching(points, goal, adjust) {
   const target = cents(goal)
   for (let i = 0; i < points.length; i++) {
-    if (cents(points[i].balance) + (adjust ? adjust[i] : 0) >= target) return points[i].period
+    // Con «Euros de hoy», los puntos traen su `deflator` y el ajuste (en euros de cada mes) se
+    // convierte igual que el patrimonio.
+    const extra = adjust ? adjust[i] * (points[i].deflator ?? 1) : 0
+    if (cents(points[i].balance) + extra >= target) return points[i].period
   }
   return null
 }

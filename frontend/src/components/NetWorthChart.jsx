@@ -132,19 +132,27 @@ function cushionTone(months) {
   return 'text-foreground'
 }
 
+const inflationFormat = new Intl.NumberFormat('es-ES', { style: 'percent', maximumFractionDigits: 1 })
+const formatInflation = (percent) => `inflación ${inflationFormat.format(percent / 100)}`
+
 /**
- * Colchón (`cushionMonths`), discreto: en móvil bajo el título; en PC arriba a la derecha, a la
- * altura del título.
+ * Colchón (`cushionMonths`) y, con «Euros de hoy», la inflación descontada. Discreto: en móvil
+ * bajo el título; en PC arriba a la derecha, a la altura del título.
  */
-function ChartSummary({ cushion, className }) {
+function ChartSummary({ cushion, inflation, className }) {
   return (
-    <CardDescription className={cn('text-xs', className)}>
+    <CardDescription className={cn('flex flex-wrap gap-x-3 gap-y-0.5 text-xs', className)}>
       <span title="Meses de gastos fijos (GFM) que cubre tu patrimonio de hoy">
         Colchón{' '}
         <span className={cn('font-medium tabular-nums', cushion !== null && cushionTone(cushion))}>
           {cushion === null ? '—' : formatMonths(cushion)}
         </span>
       </span>
+      {inflation !== null && (
+        <span title="Importes en euros de hoy: se descuenta esta inflación anual (Ajustes)">
+          En € de hoy <span className="tabular-nums">· {formatInflation(inflation)}</span>
+        </span>
+      )}
     </CardDescription>
   )
 }
@@ -339,7 +347,8 @@ export function NetWorthChart({ className }) {
   }, [])
   // Las tres vistas ya están en memoria: cambiar de una a otra no hace peticiones.
   const { projections, chart, settings, flows } = useFinanceData()
-  const { splitLines, calendar } = chart
+  const { splitLines, calendar, realTerms, inflation } = chart
+  const shownInflation = realTerms ? inflation : null
   const { error, loading } = projections
   const data = projections.data?.[granularity]
 
@@ -410,11 +419,11 @@ export function NetWorthChart({ className }) {
             )}
           />
         </CardTitle>
-        {ready && !isDesktop && <ChartSummary cushion={cushion} />}
+        {ready && !isDesktop && <ChartSummary cushion={cushion} inflation={shownInflation} />}
         {((ready && isDesktop) || splitLines) && (
           // PC: el resumen a la altura del título y, debajo, la leyenda. Móvil: solo la leyenda.
           <CardAction className="flex flex-col items-end gap-1.5">
-            {ready && isDesktop && <ChartSummary cushion={cushion} className="flex min-h-5 items-center justify-end" />}
+            {ready && isDesktop && <ChartSummary cushion={cushion} inflation={shownInflation} className="min-h-5 items-center justify-end" />}
             {splitLines && (
               <div className="flex gap-3 text-xs">
                 {SPLIT_SERIES.map((series) => (

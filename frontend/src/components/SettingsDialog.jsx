@@ -54,6 +54,50 @@ function SwitchSetting({ id, label, description, checked, onCheckedChange }) {
   )
 }
 
+/** «Euros de hoy»: interruptor y, activado, la inflación anual que se descuenta (en %). */
+function InflationSetting() {
+  const { realTerms, setRealTerms, inflation, setInflation } = useFinanceData().chart
+  // El campo guarda lo que se escribe; la gráfica solo cambia con valores válidos (0–20 %).
+  const [rate, setRate] = useState(String(inflation).replace('.', ','))
+
+  function handleRate(event) {
+    setRate(event.target.value)
+    const value = Number(event.target.value.replace(',', '.'))
+    if (event.target.value !== '' && Number.isFinite(value) && value >= 0 && value <= 20) setInflation(value)
+  }
+
+  return (
+    <div className="grid gap-3 rounded-lg border p-3">
+      <div className="flex items-center justify-between gap-4">
+        <Label htmlFor="settings-real-terms" className="grid gap-1">
+          Euros de hoy
+          <span className="text-muted-foreground text-xs font-normal">
+            Descuenta la inflación: cada importe de la gráfica y del objetivo se ve con lo que se podría comprar hoy
+            con él. Lo de dentro de unos años vale menos; lo de hace años, más.
+          </span>
+        </Label>
+        <Switch id="settings-real-terms" checked={realTerms} onCheckedChange={setRealTerms} />
+      </div>
+      {realTerms && (
+        <div className="flex items-center justify-between gap-4">
+          <Label htmlFor="settings-inflation" className="text-sm font-normal">
+            Inflación anual (%)
+          </Label>
+          <Input
+            id="settings-inflation"
+            type="text"
+            inputMode="decimal"
+            value={rate}
+            onChange={handleRate}
+            aria-invalid={rate !== '' && Number(rate.replace(',', '.')) !== inflation}
+            className="w-20 text-right tabular-nums"
+          />
+        </div>
+      )}
+    </div>
+  )
+}
+
 function ChartSettings() {
   const { splitLines, setSplitLines, calendar, setCalendar } = useFinanceData().chart
   return (
@@ -72,6 +116,7 @@ function ChartSettings() {
         checked={calendar}
         onCheckedChange={setCalendar}
       />
+      <InflationSetting />
     </>
   )
 }
