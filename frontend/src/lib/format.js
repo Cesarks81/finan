@@ -26,6 +26,15 @@ const pointsSigned = new Intl.NumberFormat('es-ES', {
 export const formatPointsSigned = (ratio) => `${pointsSigned.format(ratio * 100)} p.p.`
 /** Proporción (0,132) como porcentaje con signo: «+13,2 %». */
 export const formatPercentSigned = (ratio) => percentSigned.format(ratio)
+const percentWhole = new Intl.NumberFormat('es-ES', { style: 'percent', maximumFractionDigits: 0 })
+/** Proporción (0,25) como porcentaje redondeado: «25 %». */
+export const formatPercent = (ratio) => percentWhole.format(ratio)
+const monthsCount = new Intl.NumberFormat('es-ES', { maximumFractionDigits: 1 })
+/** Número de meses: «6,1 meses», «1 mes»; desde 10, sin decimales («14 meses»). */
+export function formatMonths(value) {
+  const rounded = value >= 10 ? Math.round(value) : Math.round(value * 10) / 10
+  return `${monthsCount.format(rounded)} ${rounded === 1 ? 'mes' : 'meses'}`
+}
 /** Importe abreviado para los ejes, con K y M en vez de «mil» y «M»: «500 €», «12,5K €», «1,2M €». */
 export function formatEURCompact(value) {
   const amount = Number(value)
