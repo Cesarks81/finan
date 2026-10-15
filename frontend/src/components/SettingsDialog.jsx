@@ -137,7 +137,7 @@ function InitialBalanceForm({ settings }) {
 
   return (
     <form onSubmit={handleSubmit} className="grid gap-4">
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] items-end gap-4">
         <div className="grid gap-2">
           <Label htmlFor="initial-amount">Patrimonio (€)</Label>
           <Input
@@ -331,7 +331,7 @@ function GoalForm({ settings }) {
 
   return (
     <form onSubmit={handleSubmit} className="grid gap-4">
-      <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-4">
+      <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] items-end gap-4">
         <div className="grid gap-2">
           <Label htmlFor="goal-name">Para qué</Label>
           <Input id="goal-name" value={name} onChange={edit(setName)} maxLength={60} />
@@ -501,7 +501,7 @@ function InvestmentForm({ settings }) {
 
   return (
     <form onSubmit={handleSubmit} className="grid gap-4">
-      <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-4">
+      <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] items-end gap-4">
         <div className="grid gap-2">
           <Label htmlFor="invest-amount">Invertido hoy (€)</Label>
           <Input
@@ -530,7 +530,7 @@ function InvestmentForm({ settings }) {
           />
         </div>
       </div>
-      <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-4">
+      <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] items-end gap-4">
         <div className="grid gap-2">
           <Label htmlFor="invest-monthly">Aportas al mes (€)</Label>
           <Input
