@@ -24,7 +24,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { useFinanceData } from '@/hooks/useFinanceData'
 import { useTheme } from '@/hooks/useTheme'
 import { formatDate, formatEURWhole, toISODate } from '@/lib/format'
-import { investmentOf, investmentValue } from '@/lib/investment'
+import { investmentOf } from '@/lib/investment'
 import { cn } from '@/lib/utils'
 
 function SwitchSetting({ id, label, description, checked, onCheckedChange }) {
@@ -387,11 +387,11 @@ function GoalSetting() {
  * guardar se toma esa cifra como punto de partida con fecha de hoy.
  */
 function InvestmentForm({ settings }) {
-  const { refresh } = useFinanceData()
+  const { refresh, investmentValueAt } = useFinanceData()
   const [today] = useState(() => toISODate(new Date()))
   const current = investmentOf(settings)
   const [form, setForm] = useState(() => ({
-    amount: current ? investmentValue(current, today).toFixed(2) : '',
+    amount: current ? (investmentValueAt(today) ?? current.amount).toFixed(2) : '',
     monthly: current?.monthly ? String(current.monthly) : '',
     rate: current ? String(Number(settings.invest_return)) : '',
   }))
@@ -525,7 +525,7 @@ const PAGES = {
   investment: {
     title: 'Inversión',
     description:
-      'Qué parte de tu patrimonio está en fondos, acciones o similares (ya cuenta dentro de tu patrimonio: aquí solo dices cuánto está invertido). Solo esa parte crece con la rentabilidad; el resto, no. Lo que aportas cada mes sale de lo que ahorras (no es un gasto) y también rinde. La gráfica sigue mostrando el patrimonio total.',
+      'Qué parte de tu patrimonio está en fondos, acciones o similares (ya cuenta dentro de tu patrimonio: aquí solo dices cuánto está invertido). Solo esa parte crece con la rentabilidad; el resto, no. Lo que aportas cada mes sale de lo que te sobra ese mes (no es un gasto) y también rinde; nunca se invierte más de lo que sobra: si un mes sobra menos, se aporta solo eso, y si no sobra nada, ese mes no se aporta. La gráfica sigue mostrando el patrimonio total.',
     Content: InvestmentSetting,
   },
   reset: {

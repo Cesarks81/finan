@@ -4,7 +4,7 @@ import { api } from '@/api/client'
 import { FinanceDataContext, useApiQuery } from '@/hooks/useFinanceData'
 import { usePersistentState } from '@/hooks/usePersistentState'
 import { inRealTerms } from '@/lib/inflation'
-import { investmentOf, withInvestment } from '@/lib/investment'
+import { investmentOf, investmentValue, monthlySurplus, withInvestment } from '@/lib/investment'
 import { fetchAllProjections } from '@/lib/projections'
 
 /**
@@ -40,6 +40,16 @@ export function FinanceDataProvider({ children }) {
     if (realTerms) data = inRealTerms(data, inflation / 100)
     return { ...nominal, data }
   }, [nominal, settings.data, settings.error, realTerms, inflation])
+  // Lo que vale la inversión en una fecha (con lo aportado y rendido desde que se guardó), para
+  // que Ajustes muestre su valor de hoy. Null sin inversión o sin proyecciones.
+  const investmentValueAt = useCallback(
+    (iso) => {
+      const investment = investmentOf(settings.data)
+      if (!investment || !nominal.data) return null
+      return investmentValue(investment, iso, monthlySurplus(nominal.data))
+    },
+    [settings.data, nominal.data],
+  )
 
   const value = useMemo(
     () => ({
@@ -48,6 +58,7 @@ export function FinanceDataProvider({ children }) {
       projections,
       flows,
       settings,
+      investmentValueAt,
       chart: { splitLines, setSplitLines, calendar, setCalendar, realTerms, setRealTerms, inflation, setInflation },
     }),
     [
@@ -56,6 +67,7 @@ export function FinanceDataProvider({ children }) {
       projections,
       flows,
       settings,
+      investmentValueAt,
       splitLines,
       setSplitLines,
       calendar,
