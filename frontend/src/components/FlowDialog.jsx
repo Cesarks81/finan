@@ -165,7 +165,6 @@ function FlowForm({ flow, defaultType, onDone }) {
             id="flow-concept"
             value={form.concept}
             onChange={set('concept')}
-            placeholder={`Ej.: ${type.placeholder}`}
             maxLength={120}
             required
             autoFocus
@@ -185,7 +184,6 @@ function FlowForm({ flow, defaultType, onDone }) {
               step="0.01"
               value={form.amount}
               onChange={set('amount')}
-              placeholder="0,00"
               required
             />
           </Field>
