@@ -8,6 +8,7 @@ import { NetWorthChart } from '@/components/NetWorthChart'
 import { SettingsDialog } from '@/components/SettingsDialog'
 import { Button } from '@/components/ui/button'
 import { useFinanceData } from '@/hooks/useFinanceData'
+import { usePersistentState } from '@/hooks/usePersistentState'
 import { formatEUR } from '@/lib/format'
 import { cn } from '@/lib/utils'
 
@@ -43,6 +44,8 @@ function PortfolioValue() {
 export function Dashboard() {
   const [dialog, setDialog] = useState({ open: false, flow: null, type: 'GVM', key: 0 })
   const [settingsOpen, setSettingsOpen] = useState(false)
+  // Ajuste de la gráfica: patrimonio (una línea) o ingresos y gastos acumulados (dos líneas).
+  const [splitLines, setSplitLines] = usePersistentState('finan-chart-split', false)
 
   const openDialog = (changes) => setDialog((current) => ({ ...current, ...changes, open: true, key: current.key + 1 }))
   const openCreate = (type) => openDialog({ flow: null, type })
@@ -69,7 +72,7 @@ export function Dashboard() {
       </header>
 
       <main className="flex min-h-0 flex-1 flex-col gap-4 md:grid md:flex-none md:grid-cols-[minmax(0,1fr)_15rem] md:grid-rows-[auto_auto] md:gap-6 lg:grid-cols-[minmax(0,1fr)_18rem]">
-        <NetWorthChart className="min-h-0 flex-1 md:col-start-1 md:row-start-1 md:flex-none" />
+        <NetWorthChart splitLines={splitLines} className="min-h-0 flex-1 md:col-start-1 md:row-start-1 md:flex-none" />
         <FlowButtons onSelect={openCreate} className="md:col-start-2 md:row-start-1" />
         <HistoryTable onEdit={openEdit} className="hidden md:col-start-1 md:row-start-2 md:flex" />
       </main>
@@ -81,7 +84,12 @@ export function Dashboard() {
         defaultType={dialog.type}
         formKey={dialog.key}
       />
-      <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
+      <SettingsDialog
+        open={settingsOpen}
+        onOpenChange={setSettingsOpen}
+        splitLines={splitLines}
+        onSplitLinesChange={setSplitLines}
+      />
     </div>
   )
 }

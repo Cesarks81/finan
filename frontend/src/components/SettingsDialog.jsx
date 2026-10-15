@@ -41,6 +41,21 @@ function ThemeSetting() {
   )
 }
 
+function SplitLinesSetting({ checked, onCheckedChange }) {
+  return (
+    <div className="flex items-center justify-between gap-4 rounded-lg border p-3">
+      <Label htmlFor="settings-split-lines" className="grid gap-1">
+        Ingresos y gastos por separado
+        <span className="text-muted-foreground text-xs font-normal">
+          En vez del patrimonio, dos líneas acumuladas: ingresos en azul y gastos en rojo. La distancia entre ellas
+          es lo que ahorras.
+        </span>
+      </Label>
+      <Switch id="settings-split-lines" checked={checked} onCheckedChange={onCheckedChange} />
+    </div>
+  )
+}
+
 function InitialBalanceForm({ settings }) {
   const { refresh } = useFinanceData()
   const [amount, setAmount] = useState(settings.balance_date ? settings.initial_balance : '')
@@ -130,19 +145,20 @@ function SessionSetting() {
   )
 }
 
-/** Modal de ajustes (engranaje del encabezado): tema, patrimonio inicial y sesión. */
-export function SettingsDialog({ open, onOpenChange }) {
+/** Modal de ajustes (engranaje del encabezado): tema, tipo de gráfica, patrimonio inicial y sesión. */
+export function SettingsDialog({ open, onOpenChange, splitLines, onSplitLinesChange }) {
   const { required: hasSession } = useAuth()
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="gap-6">
         <DialogHeader>
           <DialogTitle>Ajustes</DialogTitle>
-          <DialogDescription className="sr-only">Apariencia, patrimonio inicial y sesión</DialogDescription>
+          <DialogDescription className="sr-only">Apariencia, gráfica, patrimonio inicial y sesión</DialogDescription>
         </DialogHeader>
 
         <Section title="Apariencia">
           <ThemeSetting />
+          <SplitLinesSetting checked={splitLines} onCheckedChange={onSplitLinesChange} />
         </Section>
 
         <Section
