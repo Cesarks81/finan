@@ -86,4 +86,6 @@ export const api = {
   deleteFlows: (flowTypes) => request('/flows', { method: 'DELETE', params: { flow_type: flowTypes } }),
   getSettings: () => request('/settings'),
   updateSettings: (settings) => request('/settings', { method: 'PUT', body: settings }),
+  /** Cambia solo los ajustes enviados (p. ej. `{ savings_target }`). */
+  patchSettings: (changes) => request('/settings', { method: 'PATCH', body: changes }),
 }
