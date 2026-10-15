@@ -10,7 +10,6 @@ const fullDate = new Intl.DateTimeFormat('es-ES', { day: 'numeric', month: 'shor
 const monthShort = new Intl.DateTimeFormat('es-ES', { month: 'short', year: '2-digit' })
 const monthLong = new Intl.DateTimeFormat('es-ES', { month: 'long', year: 'numeric' })
 
-const eurSigned = new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR', signDisplay: 'exceptZero' })
 const percentSigned = new Intl.NumberFormat('es-ES', {
   style: 'percent',
   minimumFractionDigits: 1,
@@ -19,8 +18,14 @@ const percentSigned = new Intl.NumberFormat('es-ES', {
 })
 
 export const formatEUR = (value) => eur.format(Number(value))
-/** Importe con signo: «+1.200,00 €», «−80,00 €». */
-export const formatEURSigned = (value) => eurSigned.format(Number(value))
+const pointsSigned = new Intl.NumberFormat('es-ES', {
+  minimumFractionDigits: 1,
+  maximumFractionDigits: 1,
+  signDisplay: 'exceptZero',
+})
+
+/** Diferencia entre dos proporciones (0,278) en puntos porcentuales: «+27,8 p.p.». */
+export const formatPointsSigned = (ratio) => `${pointsSigned.format(ratio * 100)} p.p.`
 /** Proporción (0,132) como porcentaje con signo: «+13,2 %». */
 export const formatPercentSigned = (ratio) => percentSigned.format(ratio)
 export const formatEURCompact = (value) => eurCompact.format(Number(value))

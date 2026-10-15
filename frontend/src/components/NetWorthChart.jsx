@@ -19,10 +19,11 @@ import {
   currentPeriod,
   formatEUR,
   formatEURCompact,
-  formatEURSigned,
   formatPercentSigned,
+  formatPointsSigned,
   formatPeriod,
 } from '@/lib/format'
+import { savingsTrend } from '@/lib/savingsStats'
 import { cn } from '@/lib/utils'
 
 const axisTick = { fill: 'var(--muted-foreground)', fontSize: 12 }
@@ -120,53 +121,30 @@ function toChartPoints(apiPoints) {
   })
 }
 
-/**
- * Resumen de la vista visible (cambia con D/M/A):
- * - `savingsRate`: tasa de ahorro, la parte de lo ingresado que queda tras los gastos,
- *   (ingresos − gastos) / ingresos. Es la distancia entre las líneas azul y roja, en %.
- * - `growth`: crecimiento del patrimonio de principio a fin, (final − inicial) / |inicial|.
- *   Si el patrimonio inicial es 0 no hay porcentaje y queda `change`, la variación en €.
- */
-function summarize(points) {
-  if (!points.length) return null
-  const first = points[0]
-  const last = points.at(-1)
-  const income = last.incomeTotal
-  const expense = last.expenseTotal
-  // Patrimonio justo antes del primer periodo: el del primero sin sus movimientos.
-  const startBalance = Math.round((first.balance - first.income + first.expense) * 100) / 100
-  const change = last.balance - startBalance
-  return {
-    savingsRate: income > 0 ? (income - expense) / income : null,
-    growth: startBalance !== 0 ? change / Math.abs(startBalance) : null,
-    change,
-  }
-}
-
+// Lo que se muestra como «0,0» (menos de 0,05 puntos) va en gris, no en verde ni en rojo.
 function toneOf(value) {
-  if (value > 0) return 'text-income'
-  if (value < 0) return 'text-expense'
+  if (value > 0.0005) return 'text-income'
+  if (value < -0.0005) return 'text-expense'
   return 'text-muted-foreground'
 }
 
 /**
- * Línea discreta con la tasa de ahorro y el crecimiento de la vista: en móvil bajo el título;
- * en PC arriba a la derecha, a la altura del título.
+ * Línea discreta con la evolución del ahorro (`savingsTrend`): en móvil bajo el título; en PC
+ * arriba a la derecha, a la altura del título. `unit` es el periodo comparado («mes» o «año»).
  */
-function ChartSummary({ stats, className }) {
-  const growthValue = stats.growth ?? stats.change
+function ChartSummary({ stats, unit, className }) {
   return (
     <CardDescription className={cn('flex flex-wrap gap-x-3 gap-y-0.5 text-xs', className)}>
-      <span title="Parte de lo ingresado que queda tras los gastos en esta vista: (ingresos − gastos) / ingresos">
-        Ahorro medio{' '}
-        <span className={cn('font-medium tabular-nums', toneOf(stats.savingsRate))}>
-          {stats.savingsRate === null ? '—' : formatPercentSigned(stats.savingsRate)}
+      <span title={`Media de cuánto cambia lo que ahorras (ingresos − gastos) de un ${unit} al siguiente`}>
+        Media de ahorro{' '}
+        <span className={cn('font-medium tabular-nums', toneOf(stats.average))}>
+          {stats.average === null ? '—' : formatPercentSigned(stats.average)}
         </span>
       </span>
-      <span title="Cuánto crece el patrimonio del principio al final de esta vista">
-        Crecimiento{' '}
-        <span className={cn('font-medium tabular-nums', toneOf(growthValue))}>
-          {stats.growth === null ? formatEURSigned(stats.change) : formatPercentSigned(stats.growth)}
+      <span title={`Si ese cambio se acelera (+) o se frena (−) de un ${unit} al siguiente, en puntos porcentuales`}>
+        Tendencia{' '}
+        <span className={cn('font-medium tabular-nums', toneOf(stats.trend))}>
+          {stats.trend === null ? '—' : formatPointsSigned(stats.trend)}
         </span>
       </span>
     </CardDescription>
@@ -254,7 +232,11 @@ export function NetWorthChart({ className }) {
 
   const points = useMemo(() => toChartPoints(data?.points ?? []), [data])
   const layers = useMemo(() => splitLayers(points), [points])
-  const stats = useMemo(() => summarize(points), [points])
+  // El ahorro se compara mes a mes (en D también: día a día casi siempre es 0 € y el % no dice
+  // nada) y, en la vista A, año a año. Sale de las vistas M y A ya en caché.
+  const statsSource = granularity === 'A' ? projections.data?.A : projections.data?.M
+  const stats = useMemo(() => (statsSource ? savingsTrend(statsSource.points) : null), [statsSource])
+  const statsUnit = granularity === 'A' ? 'año' : 'mes'
   const hasNegative = !splitLines && points.some((p) => p.balance < 0)
   // Solo en la vista de patrimonio y si se ha indicado un patrimonio inicial (con su fecha).
   const initialBalance = !splitLines && data?.balance_date ? Number(data.initial_balance) : null
@@ -288,11 +270,13 @@ export function NetWorthChart({ className }) {
             )}
           />
         </CardTitle>
-        {stats && !isDesktop && <ChartSummary stats={stats} />}
+        {stats && !isDesktop && <ChartSummary stats={stats} unit={statsUnit} />}
         {((stats && isDesktop) || splitLines) && (
           // PC: el resumen a la altura del título y, debajo, la leyenda. Móvil: solo la leyenda.
           <CardAction className="flex flex-col items-end gap-1.5">
-            {stats && isDesktop && <ChartSummary stats={stats} className="min-h-5 items-center justify-end" />}
+            {stats && isDesktop && (
+              <ChartSummary stats={stats} unit={statsUnit} className="min-h-5 items-center justify-end" />
+            )}
             {splitLines && (
               <div className="flex gap-3 text-xs">
                 {SPLIT_SERIES.map((series) => (
