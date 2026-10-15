@@ -155,7 +155,7 @@ SETTINGS_ID = 1
 def load_settings(db: Session) -> models.Settings:
     """Ajustes guardados o, si aún no existen, los valores por defecto (sin persistir)."""
     return db.get(models.Settings, SETTINGS_ID) or models.Settings(
-        id=SETTINGS_ID, initial_balance=Decimal(0), balance_date=None, savings_target=None, goal_name=None, goal_amount=None
+        id=SETTINGS_ID, initial_balance=Decimal(0), balance_date=None, goal_name=None, goal_amount=None
     )
 
 

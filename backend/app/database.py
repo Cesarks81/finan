@@ -54,7 +54,7 @@ def add_missing_columns() -> None:
     """Añade a las tablas que ya existen las columnas nuevas de los modelos.
 
     `create_all` crea las tablas que faltan pero no toca las existentes, así que una columna
-    añadida a un modelo (p. ej. `settings.savings_target`) no llegaría a una base con datos,
+    añadida a un modelo (p. ej. `settings.goal_amount`) no llegaría a una base con datos,
     como la de Neon. Solo sirve para columnas que admiten NULL y sin valor por defecto en la
     base; cambios mayores necesitarían una migración de verdad (Alembic).
     """

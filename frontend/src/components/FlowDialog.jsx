@@ -16,9 +16,8 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useFinanceData } from '@/hooks/useFinanceData'
-import { monthlyBudget } from '@/lib/budget'
 import { FIXED_TYPES, FLOW_ORDER, FLOW_TYPES, VARIABLE_TYPES, isRecurringFlow } from '@/lib/flowTypes'
-import { formatEURWhole, formatMonthYear, toISODate } from '@/lib/format'
+import { formatMonthYear, toISODate } from '@/lib/format'
 import { goalImpact } from '@/lib/goal'
 import { cn } from '@/lib/utils'
 
@@ -104,65 +103,38 @@ function ImpactRow({ label, before, after, tone }) {
 }
 
 /**
- * «Así te afecta»: cómo cambian «Disponible este mes» y la fecha del objetivo con el flujo del
- * formulario (al editar, en lugar del original). Solo las filas que cambian; nada si no hay
- * disponible ni objetivo, o si el formulario aún no está completo.
+ * «Así te afecta»: cómo cambia la fecha del objetivo con el flujo del formulario (al editar, en
+ * lugar del original). Nada si no hay objetivo, si no cambia o si el formulario aún no está
+ * completo.
  */
 function ImpactPreview({ form, flow }) {
-  const { flows, settings, projections } = useFinanceData()
+  const { settings, projections } = useFinanceData()
   const candidate = toPayload(form)
   const complete =
     Number(candidate.amount) > 0 &&
     ISO_DATE.test(candidate.start_date) &&
     (form.variableMode !== 'months' || candidate.duration_months >= 1) &&
     (form.variableMode !== 'until' || ISO_DATE.test(candidate.end_date ?? ''))
-  if (!complete || !flows.data || !settings.data) return null
-  const candidateFlow = { ...candidate, is_recurring: isRecurringFlow(candidate) }
-
-  const rows = []
-  const target = settings.data.savings_target
-  const budgetBefore = monthlyBudget(flows.data, target)
-  if (budgetBefore) {
-    const others = flows.data.filter((f) => f.id !== flow?.id)
-    const budgetAfter = monthlyBudget([...others, candidateFlow], target)
-    if (Math.round(budgetAfter.available * 100) !== Math.round(budgetBefore.available * 100)) {
-      rows.push(
-        <ImpactRow
-          key="budget"
-          label="Disponible este mes"
-          before={formatEURWhole(budgetBefore.available)}
-          after={formatEURWhole(budgetAfter.available)}
-          tone={budgetAfter.available < 0 ? 'bad' : budgetAfter.available > budgetBefore.available ? 'good' : null}
-        />,
-      )
-    }
-  }
-
-  const goal = settings.data.goal_amount
+  const goal = settings.data?.goal_amount
   const long = projections.data?.long
   const reached = Number(projections.data?.todayBalance) >= Number(goal)
-  if (goal && long && !reached) {
-    const { before, after, delta } = goalImpact(long, goal, candidateFlow, flow, settings.data.balance_date)
-    if (before !== after) {
-      const text = (month) => (month ? formatMonthYear(month) : 'más de 40 años')
-      const later = delta === null ? !after : delta > 0
-      rows.push(
-        <ImpactRow
-          key="goal"
-          label={settings.data.goal_name || 'Objetivo'}
-          before={text(before)}
-          after={text(after)}
-          tone={later ? 'bad' : 'good'}
-        />,
-      )
-    }
-  }
+  if (!complete || !goal || !long || reached) return null
 
-  if (!rows.length) return null
+  const candidateFlow = { ...candidate, is_recurring: isRecurringFlow(candidate) }
+  const { before, after, delta } = goalImpact(long, goal, candidateFlow, flow, settings.data.balance_date)
+  if (before === after) return null
+  const text = (month) => (month ? formatMonthYear(month) : 'más de 40 años')
+  const later = delta === null ? !after : delta > 0
+
   return (
     <section aria-label="Así te afecta" className="bg-muted/60 grid gap-2.5 rounded-lg px-3.5 py-3">
       <h3 className="text-muted-foreground m-0 text-xs font-semibold tracking-wide uppercase">Así te afecta</h3>
-      {rows}
+      <ImpactRow
+        label={settings.data.goal_name || 'Objetivo'}
+        before={text(before)}
+        after={text(after)}
+        tone={later ? 'bad' : 'good'}
+      />
     </section>
   )
 }

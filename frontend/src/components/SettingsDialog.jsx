@@ -262,72 +262,6 @@ function ResetSetting() {
   )
 }
 
-/** Ahorro mensual deseado: se aparta antes de calcular «Disponible este mes». */
-function SavingsTargetForm({ settings }) {
-  const { refresh } = useFinanceData()
-  const [amount, setAmount] = useState(settings.savings_target ?? '')
-  const [status, setStatus] = useState('idle') // idle | saving | saved
-  const [error, setError] = useState(null)
-
-  async function handleSubmit(event) {
-    event.preventDefault()
-    setStatus('saving')
-    setError(null)
-    try {
-      const value = String(amount).trim().replace(',', '.')
-      await api.patchSettings({ savings_target: value === '' ? null : value })
-      refresh()
-      setStatus('saved')
-    } catch (err) {
-      setError(err.message)
-      setStatus('idle')
-    }
-  }
-
-  return (
-    <form onSubmit={handleSubmit} className="grid gap-3">
-      <div className="grid gap-2">
-        <Label htmlFor="savings-target">Quiero ahorrar al mes (€)</Label>
-        <Input
-          id="savings-target"
-          type="number"
-          inputMode="decimal"
-          min="0"
-          step="0.01"
-          value={amount}
-          onChange={(event) => {
-            setAmount(event.target.value)
-            setStatus('idle')
-          }}
-        />
-      </div>
-      {error && (
-        <p role="alert" className="text-destructive text-sm">
-          {error}
-        </p>
-      )}
-      <div className="flex items-center justify-end gap-3">
-        {status === 'saved' && (
-          <p role="status" className="text-income flex items-center gap-1 text-sm">
-            <Check className="size-4" /> Guardado
-          </p>
-        )}
-        <Button type="submit" disabled={status === 'saving'}>
-          {status === 'saving' && <LoaderCircle className="animate-spin" />}
-          Guardar
-        </Button>
-      </div>
-    </form>
-  )
-}
-
-function SavingsTargetSetting() {
-  const { data, error } = useFinanceData().settings
-  if (error) return <p className="text-destructive text-sm">{error.message}</p>
-  if (!data) return <LoaderCircle className="text-muted-foreground mx-auto size-5 animate-spin" />
-  return <SavingsTargetForm settings={data} />
-}
-
 /** Objetivo de patrimonio: nombre e importe. Vacío el importe, se quita. */
 function GoalForm({ settings }) {
   const { refresh } = useFinanceData()
@@ -451,13 +385,6 @@ export function SettingsDialog({ open, onOpenChange }) {
           description="El patrimonio al que quieres llegar (un colchón, la entrada de un piso…). finan lo marca en la gráfica con una línea azul, te dice cuándo llegas y, al añadir un gasto o un ingreso, cuánto lo adelanta o lo retrasa."
         >
           <GoalSetting />
-        </Section>
-
-        <Section
-          title="Ahorro mensual"
-          description="Lo que quieres apartar cada mes, antes de gastar. Al añadir o editar un flujo, «Así te afecta» te dice cuánto te queda este mes para gastos variables: ingresos del mes − gastos fijos − este ahorro − lo que ya has gastado. Déjalo vacío para no usarlo."
-        >
-          <SavingsTargetSetting />
         </Section>
 
         <Section
