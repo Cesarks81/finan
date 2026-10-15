@@ -41,18 +41,37 @@ function ThemeSetting() {
   )
 }
 
-function SplitLinesSetting({ checked, onCheckedChange }) {
+function SwitchSetting({ id, label, description, checked, onCheckedChange }) {
   return (
     <div className="flex items-center justify-between gap-4 rounded-lg border p-3">
-      <Label htmlFor="settings-split-lines" className="grid gap-1">
-        Ingresos y gastos por separado
-        <span className="text-muted-foreground text-xs font-normal">
-          En vez del patrimonio, dos líneas acumuladas: ingresos en azul y gastos en rojo. La distancia entre ellas
-          es lo que ahorras.
-        </span>
+      <Label htmlFor={id} className="grid gap-1">
+        {label}
+        <span className="text-muted-foreground text-xs font-normal">{description}</span>
       </Label>
-      <Switch id="settings-split-lines" checked={checked} onCheckedChange={onCheckedChange} />
+      <Switch id={id} checked={checked} onCheckedChange={onCheckedChange} />
     </div>
+  )
+}
+
+function ChartSettings() {
+  const { splitLines, setSplitLines, forward, setForward } = useFinanceData().chart
+  return (
+    <>
+      <SwitchSetting
+        id="settings-split-lines"
+        label="Ingresos y gastos por separado"
+        description="En vez del patrimonio, dos líneas acumuladas: ingresos en azul y gastos en rojo. La distancia entre ellas es lo que ahorras."
+        checked={splitLines}
+        onCheckedChange={setSplitLines}
+      />
+      <SwitchSetting
+        id="settings-forward"
+        label="Vista hacia delante"
+        description="Empieza hoy, sin pasado: D muestra el próximo mes día a día, M los próximos 12 meses y A los próximos 25 años."
+        checked={forward}
+        onCheckedChange={setForward}
+      />
+    </>
   )
 }
 
@@ -147,7 +166,7 @@ function SessionSetting() {
 }
 
 /** Modal de ajustes (engranaje del encabezado): tema, tipo de gráfica, patrimonio inicial y sesión. */
-export function SettingsDialog({ open, onOpenChange, splitLines, onSplitLinesChange }) {
+export function SettingsDialog({ open, onOpenChange }) {
   const { required: hasSession } = useAuth()
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -159,7 +178,10 @@ export function SettingsDialog({ open, onOpenChange, splitLines, onSplitLinesCha
 
         <Section title="Apariencia">
           <ThemeSetting />
-          <SplitLinesSetting checked={splitLines} onCheckedChange={onSplitLinesChange} />
+        </Section>
+
+        <Section title="Gráfica">
+          <ChartSettings />
         </Section>
 
         <Section
