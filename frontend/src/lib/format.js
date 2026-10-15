@@ -13,6 +13,9 @@ const percentSigned = new Intl.NumberFormat('es-ES', {
 })
 
 export const formatEUR = (value) => eur.format(Number(value))
+const eurWhole = new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 })
+/** Importe redondeado al euro, para cifras de un vistazo: «140 €». */
+export const formatEURWhole = (value) => eurWhole.format(Number(value))
 const pointsSigned = new Intl.NumberFormat('es-ES', {
   minimumFractionDigits: 1,
   maximumFractionDigits: 1,

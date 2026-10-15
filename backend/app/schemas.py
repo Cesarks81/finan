@@ -60,11 +60,20 @@ class SettingsUpdate(BaseModel):
     balance_date: date = Field(default_factory=date.today, description="Fecha de ese patrimonio. Por defecto, hoy")
 
 
+class SettingsPatch(BaseModel):
+    """Cambio parcial de los ajustes: solo se modifican los campos enviados (null borra)."""
+
+    savings_target: Annotated[Decimal, Field(ge=0, max_digits=12, decimal_places=2)] | None = Field(
+        default=None, description="Lo que se quiere ahorrar cada mes"
+    )
+
+
 class SettingsRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     initial_balance: Decimal
     balance_date: date | None
+    savings_target: Decimal | None = None
 
 
 class Granularity(str, enum.Enum):

@@ -9,7 +9,7 @@ import threading
 from collections.abc import Iterator
 from pathlib import Path
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 BACKEND_DIR = Path(__file__).resolve().parent.parent
@@ -50,8 +50,33 @@ _schema_lock = threading.Lock()
 _schema_ready = False
 
 
+def add_missing_columns() -> None:
+    """Añade a las tablas que ya existen las columnas nuevas de los modelos.
+
+    `create_all` crea las tablas que faltan pero no toca las existentes, así que una columna
+    añadida a un modelo (p. ej. `settings.savings_target`) no llegaría a una base con datos,
+    como la de Neon. Solo sirve para columnas que admiten NULL y sin valor por defecto en la
+    base; cambios mayores necesitarían una migración de verdad (Alembic).
+    """
+    inspector = inspect(engine)
+    for table in Base.metadata.sorted_tables:
+        if not inspector.has_table(table.name):
+            continue
+        existing = {column["name"] for column in inspector.get_columns(table.name)}
+        for column in table.columns:
+            if column.name in existing:
+                continue
+            column_type = column.type.compile(dialect=engine.dialect)
+            # En Postgres, IF NOT EXISTS evita el error si otra instancia de Vercel la añade a la vez.
+            if_not_exists = "" if IS_SQLITE else "IF NOT EXISTS "
+            with engine.begin() as connection:
+                connection.execute(
+                    text(f'ALTER TABLE "{table.name}" ADD COLUMN {if_not_exists}"{column.name}" {column_type}')
+                )
+
+
 def ensure_schema() -> None:
-    """Crea las tablas que falten la primera vez que se usa la base de datos.
+    """Crea las tablas y columnas que falten la primera vez que se usa la base de datos.
 
     Se hace en la primera petición, y no al arrancar, para que funcione igual en un servidor
     normal y en las funciones serverless de Vercel.
@@ -62,6 +87,7 @@ def ensure_schema() -> None:
     with _schema_lock:
         if not _schema_ready:
             Base.metadata.create_all(bind=engine)
+            add_missing_columns()
             _schema_ready = True
 
 
