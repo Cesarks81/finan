@@ -1,6 +1,6 @@
 import { Briefcase, HandCoins, House, ShoppingBag } from 'lucide-react'
 
-import { formatDate } from '@/lib/format'
+import { formatDate, toISODate } from '@/lib/format'
 
 export const FLOW_TYPES = {
   GFM: {
@@ -45,9 +45,44 @@ export const FLOW_ORDER = ['GFM', 'GVM', 'IFM', 'IVM']
 export const VARIABLE_TYPES = ['GVM', 'IVM']
 export const FIXED_TYPES = ['GFM', 'IFM']
 
-/** Resumen de la periodicidad de un flujo devuelto por la API. */
-export function describeSchedule(flow) {
-  if (flow.duration_months) return `${flow.duration_months} ${flow.duration_months === 1 ? 'mes' : 'meses'}`
-  if (flow.is_recurring) return flow.end_date ? `Mensual hasta ${formatDate(flow.end_date)}` : 'Mensual'
-  return 'Puntual'
+/** Fecha del pago número `index` (0 = el primero), con el día ajustado a fin de mes como en el backend. */
+function monthlyPayment(startDate, index) {
+  const [year, month, day] = startDate.split('-').map(Number)
+  const daysInMonth = new Date(year, month + index, 0).getDate()
+  return toISODate(new Date(year, month - 1 + index, Math.min(day, daysInMonth)))
+}
+
+/** Fecha del último pago de un flujo recurrente, o null si no tiene fin. */
+function lastPayment(flow) {
+  const ends = []
+  if (flow.end_date) ends.push(flow.end_date)
+  if (flow.duration_months) ends.push(monthlyPayment(flow.start_date, flow.duration_months - 1))
+  return ends.sort()[0] ?? null
+}
+
+/** Pagos mensuales que quedan desde hoy (incluido) hasta el último. */
+function remainingPayments(flow, last, today) {
+  let count = 0
+  for (let index = 0; ; index++) {
+    const when = monthlyPayment(flow.start_date, index)
+    if (when > last) return count
+    if (when >= today) count++
+  }
+}
+
+/**
+ * Periodicidad de un flujo devuelto por la API para el Historial:
+ * - `label`: «Puntual», «Mensual» (sin fin) o los meses que quedan («4 meses»), que van
+ *   bajando con el tiempo; «Terminado» si ya no quedan pagos.
+ * - `recurring`: si se repite cada mes (el Historial lo enmarca).
+ * - `hint`: fecha del último pago, si la tiene.
+ */
+export function describeSchedule(flow, today = toISODate(new Date())) {
+  if (!flow.is_recurring) return { label: 'Puntual', recurring: false }
+  const last = lastPayment(flow)
+  if (!last) return { label: 'Mensual', recurring: true }
+  const hint = `Último pago: ${formatDate(last)}`
+  const remaining = remainingPayments(flow, last, today)
+  if (remaining === 0) return { label: 'Terminado', recurring: false, hint }
+  return { label: `${remaining} ${remaining === 1 ? 'mes' : 'meses'}`, recurring: true, hint }
 }

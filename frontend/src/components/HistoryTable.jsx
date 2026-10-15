@@ -100,6 +100,7 @@ export function HistoryTable({ onEdit, className }) {
               <TableBody>
                 {flows.map((flow) => {
                   const income = FLOW_TYPES[flow.flow_type].income
+                  const schedule = describeSchedule(flow)
                   return (
                     <TableRow key={flow.id}>
                       <TableCell className="text-muted-foreground">{formatDate(flow.start_date)}</TableCell>
@@ -114,13 +115,20 @@ export function HistoryTable({ onEdit, className }) {
                       <TableCell className="max-w-0 truncate font-medium" title={flow.concept}>
                         {flow.concept}
                       </TableCell>
-                      <TableCell className="text-muted-foreground">{describeSchedule(flow)}</TableCell>
+                      <TableCell className="text-muted-foreground" title={schedule.hint}>
+                        {schedule.recurring ? (
+                          <Badge variant="outline" className="text-muted-foreground font-normal">
+                            {schedule.label}
+                          </Badge>
+                        ) : (
+                          schedule.label
+                        )}
+                      </TableCell>
                       <TableCell
                         className={cn('text-right tabular-nums', income ? 'text-income' : 'text-expense')}
                       >
                         {income ? '+' : '−'}
                         {formatEUR(flow.amount)}
-                        {flow.is_recurring && <span className="text-muted-foreground text-xs">/mes</span>}
                       </TableCell>
                       <TableCell>
                         <div className="flex justify-end gap-1">
