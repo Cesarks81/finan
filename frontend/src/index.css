@@ -100,17 +100,18 @@
   }
 }
 
-/* Gráfica: Recharts la hace enfocable (se recorre con las flechas del teclado). Al tocarla,
-   algunos navegadores móviles la marcaban con un recuadro de foco alrededor de toda la
-   gráfica; tampoco se debe seleccionar ni abrir el menú de iOS al mantener el dedo. */
+/* Gráfica: Recharts la hace enfocable (se recorre con las flechas del teclado), y también sus
+   capas internas (cada área, `tabindex=-1`). Al tocarla, los navegadores marcaban con un
+   recuadro de foco la gráfica entera o el área tocada (la azul o la roja); tampoco se debe
+   seleccionar ni abrir el menú de iOS al mantener el dedo. */
 .recharts-wrapper,
-.recharts-surface {
+.recharts-wrapper * {
   -webkit-tap-highlight-color: transparent;
   -webkit-touch-callout: none;
   -webkit-user-select: none;
   user-select: none;
 }
 .recharts-wrapper:focus,
-.recharts-surface:focus {
+.recharts-wrapper :focus {
   outline: none;
 }
