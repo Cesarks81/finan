@@ -151,6 +151,37 @@ function ChartSummary({ stats, unit, className }) {
   )
 }
 
+/*
+ * Con el dedo, la información de un punto solo se ve mientras se toca la gráfica. Recharts solo
+ * atiende al dedo cuando se mueve y, tras un toque, el navegador emite eventos de ratón que lo
+ * dejan «encima» para siempre (un dedo nunca sale de la gráfica). Así que se le avisa a mano:
+ * al tocar, un movimiento de ratón en ese punto (sale al instante, aunque no se mueva el dedo);
+ * al levantarlo, que el ratón ha salido (se quita la información, la línea y el punto), y se
+ * cancelan los eventos de ratón de después. Solo dentro de la gráfica: el selector D M A sigue
+ * recibiendo sus toques.
+ */
+function chartUnderTouch(event) {
+  return event.target instanceof Element ? event.target.closest('.recharts-wrapper') : null
+}
+
+function showPointUnderFinger(event) {
+  const chart = chartUnderTouch(event)
+  const touch = event.touches[0]
+  if (!chart || !touch) return
+  chart.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, clientX: touch.clientX, clientY: touch.clientY }))
+}
+
+function hidePointOnRelease(event) {
+  const chart = chartUnderTouch(event)
+  if (!chart || event.touches.length > 0) return
+  if (event.cancelable) event.preventDefault()
+  // En el siguiente fotograma: Recharts aplica los movimientos en un requestAnimationFrame, y en
+  // un toque muy corto el del dedo llegaría después y dejaría el punto fijo.
+  requestAnimationFrame(() =>
+    chart.dispatchEvent(new MouseEvent('mouseout', { bubbles: true, relatedTarget: document.body })),
+  )
+}
+
 function TooltipRow({ label, children, className }) {
   return (
     <div className="flex justify-between gap-4">
@@ -292,7 +323,12 @@ export function NetWorthChart({ className }) {
       </CardHeader>
       <CardContent className="flex min-h-0 flex-1 flex-col px-0 md:px-4">
         {/* touch-none: al arrastrar el dedo por la gráfica solo se mueve el indicador, no la página. */}
-        <div className="relative min-h-40 flex-1 touch-none md:h-80 md:flex-none">
+        <div
+          className="relative min-h-40 flex-1 touch-none md:h-80 md:flex-none"
+          onTouchStart={showPointUnderFinger}
+          onTouchEnd={hidePointOnRelease}
+          onTouchCancel={hidePointOnRelease}
+        >
           {error ? (
             <div className="text-muted-foreground flex h-full items-center justify-center px-6 text-center text-sm">
               {error.message}
