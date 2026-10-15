@@ -304,7 +304,8 @@ export function NetWorthChart({ className }) {
                   // Montar de nuevo al cambiar de vista (o de modo) repite la animación de la línea dibujándose.
                   key={`${granularity}-${splitLines}-${calendar}`}
                   data={points}
-                  margin={isDesktop ? { top: 16, right: 12, left: 4, bottom: 0 } : { top: 16, right: 0, left: 0, bottom: 0 }}
+                  // PC: el mismo margen a los dos lados, alineado con el título (los importes ocupan solo lo que necesitan).
+                  margin={isDesktop ? { top: 16, right: 8, left: 8, bottom: 0 } : { top: 16, right: 0, left: 0, bottom: 0 }}
                 >
                   <defs>
                     {GRADIENTS.map(({ key, color }) => (
@@ -341,7 +342,7 @@ export function NetWorthChart({ className }) {
                     tick={isDesktop ? axisTick : mobileYTick}
                     tickLine={false}
                     axisLine={false}
-                    width={72}
+                    width={isDesktop ? 'auto' : 72}
                   />
                   <Tooltip
                     content={<ChartTooltip granularity={granularity} splitLines={splitLines} />}
@@ -357,7 +358,8 @@ export function NetWorthChart({ className }) {
                       strokeDasharray="2 4"
                       label={{
                         value: 'Inicial',
-                        position: 'insideTopRight',
+                        // En PC, a la izquierda: a la derecha lo tapaba el selector D M A si la línea va baja.
+                        position: isDesktop ? 'insideTopLeft' : 'insideTopRight',
                         fill: 'var(--muted-foreground)',
                         fillOpacity: 0.8,
                         fontSize: 10,
