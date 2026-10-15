@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { useAuth } from '@/hooks/useAuth'
-import { useApiQuery, useFinanceData } from '@/hooks/useFinanceData'
+import { useFinanceData } from '@/hooks/useFinanceData'
 import { useTheme } from '@/hooks/useTheme'
 import { toISODate } from '@/lib/format'
 
@@ -129,7 +129,8 @@ function InitialBalanceForm({ settings }) {
 }
 
 function InitialBalanceSetting() {
-  const { data, error } = useApiQuery(() => api.getSettings(), [])
+  // Ya está en la caché desde que se abrió la app: el formulario sale al instante.
+  const { data, error } = useFinanceData().settings
   if (error) return <p className="text-destructive text-sm">{error.message}</p>
   if (!data) return <LoaderCircle className="text-muted-foreground mx-auto size-5 animate-spin" />
   return <InitialBalanceForm settings={data} />

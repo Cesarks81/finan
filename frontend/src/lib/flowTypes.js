@@ -74,18 +74,17 @@ function remainingPayments(flow, last, today) {
  * Periodicidad de un flujo devuelto por la API para el Historial:
  * - `label`: «Puntual», «Mensual» (sin fin) o los meses que quedan («4 meses»), que van
  *   bajando con el tiempo; «Terminado» si ya no quedan pagos.
- * - `recurring`: si se repite cada mes (el Historial lo enmarca).
  * - `ended`: si ya hizo su último pago (el Historial lo lleva a «Terminados»).
  * - `hint`: fecha del último pago, si la tiene.
  */
 export function describeSchedule(flow, today = toISODate(new Date())) {
-  if (!flow.is_recurring) return { label: 'Puntual', recurring: false }
+  if (!flow.is_recurring) return { label: 'Puntual' }
   const last = lastPayment(flow)
-  if (!last) return { label: 'Mensual', recurring: true }
+  if (!last) return { label: 'Mensual' }
   const hint = `Último pago: ${formatDate(last)}`
   const remaining = remainingPayments(flow, last, today)
-  if (remaining === 0) return { label: 'Terminado', recurring: false, ended: true, hint }
-  return { label: `${remaining} ${remaining === 1 ? 'mes' : 'meses'}`, recurring: true, hint }
+  if (remaining === 0) return { label: 'Terminado', ended: true, hint }
+  return { label: `${remaining} ${remaining === 1 ? 'mes' : 'meses'}`, hint }
 }
 
 /**
