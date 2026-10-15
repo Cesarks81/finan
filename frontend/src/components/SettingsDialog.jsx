@@ -54,7 +54,7 @@ function SwitchSetting({ id, label, description, checked, onCheckedChange }) {
 }
 
 function ChartSettings() {
-  const { splitLines, setSplitLines, forward, setForward } = useFinanceData().chart
+  const { splitLines, setSplitLines, calendar, setCalendar } = useFinanceData().chart
   return (
     <>
       <SwitchSetting
@@ -65,11 +65,11 @@ function ChartSettings() {
         onCheckedChange={setSplitLines}
       />
       <SwitchSetting
-        id="settings-forward"
-        label="Vista hacia delante"
-        description="Empieza hoy, sin pasado: D muestra el próximo mes día a día, M los próximos 12 meses y A los próximos 25 años."
-        checked={forward}
-        onCheckedChange={setForward}
+        id="settings-calendar"
+        label="Vista de calendario"
+        description="D muestra el mes en curso (del día 1 al último), M el año en curso (de enero a diciembre) y A los próximos 25 años. La línea «Hoy» marca dónde estás."
+        checked={calendar}
+        onCheckedChange={setCalendar}
       />
     </>
   )
