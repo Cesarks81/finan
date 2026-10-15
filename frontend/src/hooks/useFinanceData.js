@@ -7,6 +7,7 @@ export const FinanceDataContext = createContext(null)
  * los componentes que leen de la API la incluyen en sus dependencias para recargarse.
  * `projections` ({ data: { D, M, A }, loading, error }) es la caché de las tres vistas de la gráfica
  * y `flows` y `settings` ({ data, loading, error }), las de la lista de flujos y el patrimonio inicial.
+ * `chart` tiene las preferencias de la gráfica: `splitLines`, `forward` y sus `set…`.
  */
 export function useFinanceData() {
   const context = useContext(FinanceDataContext)
