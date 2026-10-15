@@ -87,3 +87,25 @@ export function describeSchedule(flow, today = toISODate(new Date())) {
   if (remaining === 0) return { label: 'Terminado', recurring: false, ended: true, hint }
   return { label: `${remaining} ${remaining === 1 ? 'mes' : 'meses'}`, recurring: true, hint }
 }
+
+/**
+ * Lo que suma cada tipo de flujo en el mes de `today` (positivo; el signo lo da el tipo):
+ * los puntuales con fecha en ese mes y el pago de ese mes de los recurrentes que sigan activos.
+ */
+export function monthTotals(flows, today = toISODate(new Date())) {
+  const [year, month] = today.split('-').map(Number)
+  const totals = Object.fromEntries(FLOW_ORDER.map((code) => [code, 0]))
+  for (const flow of flows) {
+    let paysThisMonth
+    if (flow.is_recurring) {
+      const [startYear, startMonth] = flow.start_date.split('-').map(Number)
+      const index = (year - startYear) * 12 + (month - startMonth)
+      const last = lastPayment(flow)
+      paysThisMonth = index >= 0 && (!last || monthlyPayment(flow.start_date, index) <= last)
+    } else {
+      paysThisMonth = flow.start_date.slice(0, 7) === today.slice(0, 7)
+    }
+    if (paysThisMonth) totals[flow.flow_type] += Math.round(Number(flow.amount) * 100)
+  }
+  return Object.fromEntries(Object.entries(totals).map(([code, cents]) => [code, cents / 100]))
+}
