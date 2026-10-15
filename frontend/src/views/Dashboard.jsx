@@ -8,6 +8,7 @@ import { NetWorthChart } from '@/components/NetWorthChart'
 import { SettingsDialog } from '@/components/SettingsDialog'
 import { Button } from '@/components/ui/button'
 import { useFinanceData } from '@/hooks/useFinanceData'
+import { useIsDesktop } from '@/hooks/useMediaQuery'
 import { formatEUR } from '@/lib/format'
 import { cn } from '@/lib/utils'
 
@@ -46,6 +47,8 @@ export function Dashboard() {
   const [settingsOpen, setSettingsOpen] = useState(false)
   // Solo en móvil: bajo la gráfica, los 4 botones o el Historial (en PC se ven siempre los dos).
   const [showHistory, setShowHistory] = useState(false)
+  const isDesktop = useIsDesktop()
+  const hiddenButtons = showHistory && !isDesktop
 
   const openDialog = (changes) => setDialog((current) => ({ ...current, ...changes, open: true, key: current.key + 1 }))
   const openCreate = (type) => openDialog({ flow: null, type })
@@ -90,12 +93,16 @@ export function Dashboard() {
         <div className="relative md:contents">
           <FlowButtons
             onSelect={openCreate}
-            className={cn('md:visible md:col-start-2 md:row-start-1', showHistory && 'invisible')}
+            // Se ocultan con la opacidad del contenedor, que cambia al instante en los dos sentidos
+            // (con `invisible`, la transición de los botones retrasaba el cambio), e `inert` para
+            // que no se puedan tocar ni enfocar mientras tanto.
+            inert={hiddenButtons}
+            className={cn('md:col-start-2 md:row-start-1 md:opacity-100', hiddenButtons && 'opacity-0')}
           />
           <HistoryTable
             onEdit={openEdit}
             className={cn(
-              'absolute inset-0 md:static md:col-start-1 md:row-start-2 md:flex',
+              'bg-background absolute inset-0 md:static md:col-start-1 md:row-start-2 md:flex',
               !showHistory && 'hidden',
             )}
           />

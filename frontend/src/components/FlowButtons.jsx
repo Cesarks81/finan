@@ -8,13 +8,13 @@ import { cn } from '@/lib/utils'
  * Pila vertical de los 4 botones grandes de flujo (GFM, GVM, IFM, IVM), en ese orden. Cada uno
  * muestra a la izquierda el tipo y a la derecha lo que suma ese tipo en el mes en curso.
  */
-export function FlowButtons({ onSelect, className }) {
+export function FlowButtons({ onSelect, className, ...props }) {
   const flows = useFinanceData().flows.data
   const totals = flows && monthTotals(flows)
   const month = formatMonth()
 
   return (
-    <div className={cn('flex flex-col gap-3', className)}>
+    <div className={cn('flex flex-col gap-3', className)} {...props}>
       {FLOW_ORDER.map((code) => {
         const { name, income } = FLOW_TYPES[code]
         const total = totals?.[code]
