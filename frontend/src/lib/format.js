@@ -10,7 +10,19 @@ const fullDate = new Intl.DateTimeFormat('es-ES', { day: 'numeric', month: 'shor
 const monthShort = new Intl.DateTimeFormat('es-ES', { month: 'short', year: '2-digit' })
 const monthLong = new Intl.DateTimeFormat('es-ES', { month: 'long', year: 'numeric' })
 
+const eurSigned = new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR', signDisplay: 'exceptZero' })
+const percentSigned = new Intl.NumberFormat('es-ES', {
+  style: 'percent',
+  minimumFractionDigits: 1,
+  maximumFractionDigits: 1,
+  signDisplay: 'exceptZero',
+})
+
 export const formatEUR = (value) => eur.format(Number(value))
+/** Importe con signo: «+1.200,00 €», «−80,00 €». */
+export const formatEURSigned = (value) => eurSigned.format(Number(value))
+/** Proporción (0,132) como porcentaje con signo: «+13,2 %». */
+export const formatPercentSigned = (ratio) => percentSigned.format(ratio)
 export const formatEURCompact = (value) => eurCompact.format(Number(value))
 
 /** 'YYYY', 'YYYY-MM' o 'YYYY-MM-DD' → Date local (sin desfase de zona horaria). */

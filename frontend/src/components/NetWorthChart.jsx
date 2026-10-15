@@ -12,13 +12,15 @@ import {
 } from 'recharts'
 
 import { GranularitySelector } from '@/components/GranularitySelector'
-import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { useFinanceData } from '@/hooks/useFinanceData'
 import { useIsDesktop } from '@/hooks/useMediaQuery'
 import {
   currentPeriod,
   formatEUR,
   formatEURCompact,
+  formatEURSigned,
+  formatPercentSigned,
   formatPeriod,
 } from '@/lib/format'
 import { cn } from '@/lib/utils'
@@ -105,6 +107,56 @@ function toChartPoints(apiPoints) {
   })
 }
 
+/**
+ * Resumen de la vista visible (cambia con D/M/A):
+ * - `savingsRate`: tasa de ahorro, la parte de lo ingresado que queda tras los gastos,
+ *   (ingresos − gastos) / ingresos. Es la distancia entre las líneas azul y roja, en %.
+ * - `growth`: crecimiento del patrimonio de principio a fin, (final − inicial) / |inicial|.
+ *   Si el patrimonio inicial es 0 no hay porcentaje y queda `change`, la variación en €.
+ */
+function summarize(points) {
+  if (!points.length) return null
+  const first = points[0]
+  const last = points.at(-1)
+  const income = last.incomeTotal
+  const expense = last.expenseTotal
+  // Patrimonio justo antes del primer periodo: el del primero sin sus movimientos.
+  const startBalance = Math.round((first.balance - first.income + first.expense) * 100) / 100
+  const change = last.balance - startBalance
+  return {
+    savingsRate: income > 0 ? (income - expense) / income : null,
+    growth: startBalance !== 0 ? change / Math.abs(startBalance) : null,
+    change,
+  }
+}
+
+function toneOf(value) {
+  if (value > 0) return 'text-income'
+  if (value < 0) return 'text-expense'
+  return 'text-muted-foreground'
+}
+
+/** Línea discreta bajo el título con la tasa de ahorro y el crecimiento de la vista. */
+function ChartSummary({ stats }) {
+  const growthValue = stats.growth ?? stats.change
+  return (
+    <CardDescription className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs">
+      <span title="Parte de lo ingresado que queda tras los gastos en esta vista: (ingresos − gastos) / ingresos">
+        Ahorro medio{' '}
+        <span className={cn('font-medium tabular-nums', toneOf(stats.savingsRate))}>
+          {stats.savingsRate === null ? '—' : formatPercentSigned(stats.savingsRate)}
+        </span>
+      </span>
+      <span title="Cuánto crece el patrimonio del principio al final de esta vista">
+        Crecimiento{' '}
+        <span className={cn('font-medium tabular-nums', toneOf(growthValue))}>
+          {stats.growth === null ? formatEURSigned(stats.change) : formatPercentSigned(stats.growth)}
+        </span>
+      </span>
+    </CardDescription>
+  )
+}
+
 function TooltipRow({ label, children, className }) {
   return (
     <div className="flex justify-between gap-4">
@@ -185,6 +237,7 @@ export function NetWorthChart({ className }) {
 
   const points = useMemo(() => toChartPoints(data?.points ?? []), [data])
   const layers = useMemo(() => splitLayers(points), [points])
+  const stats = useMemo(() => summarize(points), [points])
   const hasNegative = !splitLines && points.some((p) => p.balance < 0)
   const scale = useMemo(
     () =>
@@ -216,6 +269,7 @@ export function NetWorthChart({ className }) {
             )}
           />
         </CardTitle>
+        {stats && <ChartSummary stats={stats} />}
         {splitLines && (
           <CardAction className="flex gap-3 text-xs">
             {SPLIT_SERIES.map((series) => (
