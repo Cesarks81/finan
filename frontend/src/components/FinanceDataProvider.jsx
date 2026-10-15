@@ -13,14 +13,15 @@ import { fetchAllProjections } from '@/lib/projections'
  * también el patrimonio inicial, para que Ajustes se abra sin esperas.
  *
  * También guarda las preferencias de la gráfica (por dispositivo): `splitLines` (ingresos y
- * gastos por separado) y `forward` (vista hacia delante, que cambia las ventanas pedidas).
+ * gastos por separado) y `calendar` (vista de calendario, que cambia las ventanas pedidas).
  */
 export function FinanceDataProvider({ children }) {
   const [version, setVersion] = useState(0)
   const refresh = useCallback(() => setVersion((v) => v + 1), [])
   const [splitLines, setSplitLines] = usePersistentState('finan-chart-split', false)
-  const [forward, setForward] = usePersistentState('finan-chart-forward', false)
-  const projections = useApiQuery(() => fetchAllProjections({ forward }), [version, forward])
+  // La clave conserva el nombre de la primera versión del ajuste («Vista hacia delante»).
+  const [calendar, setCalendar] = usePersistentState('finan-chart-forward', false)
+  const projections = useApiQuery(() => fetchAllProjections({ calendar }), [version, calendar])
   const flows = useApiQuery(api.listFlows, [version])
   const settings = useApiQuery(api.getSettings, [version])
 
@@ -31,9 +32,9 @@ export function FinanceDataProvider({ children }) {
       projections,
       flows,
       settings,
-      chart: { splitLines, setSplitLines, forward, setForward },
+      chart: { splitLines, setSplitLines, calendar, setCalendar },
     }),
-    [version, refresh, projections, flows, settings, splitLines, setSplitLines, forward, setForward],
+    [version, refresh, projections, flows, settings, splitLines, setSplitLines, calendar, setCalendar],
   )
   return <FinanceDataContext.Provider value={value}>{children}</FinanceDataContext.Provider>
 }

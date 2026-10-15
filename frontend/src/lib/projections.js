@@ -14,22 +14,22 @@ const RANGES = {
     M: { start: (t) => addMonths(t, -6), end: (t) => addMonths(t, 12) },
     A: { start: (t) => new Date(t.getFullYear() - 2, 0, 1), end: (t) => new Date(t.getFullYear() + 8, 11, 31) },
   },
-  // Ajuste «Vista hacia delante»: hoy al principio. D, el próximo mes día a día (28–31 días,
-  // hasta la víspera del mismo día del mes siguiente); M, 12 meses; A, 25 años.
-  forward: {
-    D: { start: (t) => t, end: (t) => addDays(new Date(t.getFullYear(), t.getMonth() + 1, t.getDate()), -1) },
-    M: { start: (t) => t, end: (t) => addMonths(t, 11) },
-    A: { start: (t) => t, end: (t) => new Date(t.getFullYear() + 24, 11, 31) },
+  // Ajuste «Vista de calendario»: D, el mes en curso del día 1 al último; M, el año en curso de
+  // enero a diciembre; A, 25 años desde el actual. «Hoy» queda donde cae en cada uno.
+  calendar: {
+    D: { start: (t) => new Date(t.getFullYear(), t.getMonth(), 1), end: (t) => new Date(t.getFullYear(), t.getMonth() + 1, 0) },
+    M: { start: (t) => new Date(t.getFullYear(), 0, 1), end: (t) => new Date(t.getFullYear(), 11, 31) },
+    A: { start: (t) => new Date(t.getFullYear(), 0, 1), end: (t) => new Date(t.getFullYear() + 24, 11, 31) },
   },
 }
 
 /**
- * Pide a la vez las tres vistas de la gráfica: `{ D, M, A, todayBalance }`. Con `forward`,
- * las ventanas empiezan hoy (ajuste «Vista hacia delante»).
+ * Pide a la vez las tres vistas de la gráfica: `{ D, M, A, todayBalance }`. Con `calendar`,
+ * las ventanas son el mes y el año en curso (ajuste «Vista de calendario»).
  */
-export async function fetchAllProjections({ forward = false } = {}) {
+export async function fetchAllProjections({ calendar = false } = {}) {
   const today = new Date()
-  const ranges = RANGES[forward ? 'forward' : 'centered']
+  const ranges = RANGES[calendar ? 'calendar' : 'centered']
   const results = await Promise.all(
     GRANULARITIES.map((granularity) =>
       api.getProjection({

@@ -170,8 +170,8 @@ function ChartTooltip({ active, payload, granularity, splitLines }) {
  * Gráfica de patrimonio con el selector D/M/A integrado abajo a la derecha. En móvil ocupa
  * todo el ancho, sin tarjeta ni ejes; en PC va en tarjeta, con ejes y rejilla.
  * Con el ajuste «Ingresos y gastos por separado» muestra en su lugar dos líneas: ingresos
- * (azul) y gastos (rojo) acumulados desde el inicio de la vista. Con «Vista hacia delante»,
- * las ventanas empiezan hoy (ver `lib/projections.js`).
+ * (azul) y gastos (rojo) acumulados desde el inicio de la vista. Con «Vista de calendario»,
+ * las ventanas son el mes y el año en curso (ver `lib/projections.js`).
  */
 export function NetWorthChart({ className }) {
   const gradientId = useId()
@@ -179,7 +179,7 @@ export function NetWorthChart({ className }) {
   const [granularity, setGranularity] = useState('M')
   // Las tres vistas ya están en memoria: cambiar de una a otra no hace peticiones.
   const { projections, chart } = useFinanceData()
-  const { splitLines, forward } = chart
+  const { splitLines, calendar } = chart
   const { error, loading } = projections
   const data = projections.data?.[granularity]
 
@@ -239,7 +239,7 @@ export function NetWorthChart({ className }) {
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart
                   // Montar de nuevo al cambiar de vista (o de modo) repite la animación de la línea dibujándose.
-                  key={`${granularity}-${splitLines}-${forward}`}
+                  key={`${granularity}-${splitLines}-${calendar}`}
                   data={points}
                   margin={isDesktop ? { top: 16, right: 12, left: 4, bottom: 0 } : { top: 16, right: 0, left: 0, bottom: 0 }}
                 >
@@ -260,6 +260,9 @@ export function NetWorthChart({ className }) {
                     tickLine={false}
                     axisLine={false}
                     minTickGap={24}
+                    // En la vista de calendario (12 meses, 25 años…) el reparto por defecto deja huecos
+                    // desiguales: ahí se reparten las etiquetas por igual desde la primera.
+                    interval={calendar ? 'equidistantPreserveStart' : 'preserveEnd'}
                     tickMargin={8}
                   />
                   <YAxis
