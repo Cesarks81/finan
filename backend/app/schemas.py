@@ -95,6 +95,10 @@ class LoginRequest(BaseModel):
     password: str = Field(min_length=1, max_length=200)
 
 
+class DeleteFlowsResult(BaseModel):
+    deleted: int = Field(description="Número de flujos eliminados")
+
+
 class LoginResponse(BaseModel):
     token: str
 

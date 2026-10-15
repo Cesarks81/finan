@@ -13,7 +13,7 @@ from fastapi import APIRouter, Depends, FastAPI, Header, HTTPException, Query, R
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import ValidationError
-from sqlalchemy import select, text
+from sqlalchemy import delete, select, text
 from sqlalchemy.orm import Session
 
 from . import auth, models, schemas
@@ -124,6 +124,20 @@ def update_flow(flow_id: int, payload: schemas.FlowUpdate, db: DbSession) -> mod
     db.commit()
     db.refresh(flow)
     return flow
+
+
+@private.delete("/flows", response_model=schemas.DeleteFlowsResult, tags=["flujos"])
+def delete_flows(
+    db: DbSession,
+    flow_type: Annotated[
+        list[models.FlowType],
+        Query(min_length=1, description="Tipos a borrar (obligatorio: nunca se borra todo sin indicarlo)"),
+    ],
+) -> schemas.DeleteFlowsResult:
+    """Borra de golpe todos los flujos de los tipos indicados (Ajustes → Restablecer datos)."""
+    result = db.execute(delete(models.Flow).where(models.Flow.flow_type.in_(flow_type)))
+    db.commit()
+    return schemas.DeleteFlowsResult(deleted=result.rowcount)
 
 
 @private.delete("/flows/{flow_id}", status_code=status.HTTP_204_NO_CONTENT, tags=["flujos"])

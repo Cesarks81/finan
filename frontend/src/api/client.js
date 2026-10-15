@@ -82,6 +82,8 @@ export const api = {
   createFlow: (flow) => request('/flows', { method: 'POST', body: flow }),
   updateFlow: (id, changes) => request(`/flows/${id}`, { method: 'PATCH', body: changes }),
   deleteFlow: (id) => request(`/flows/${id}`, { method: 'DELETE' }),
+  /** Borra todos los flujos de los tipos indicados; devuelve `{ deleted }`. */
+  deleteFlows: (flowTypes) => request('/flows', { method: 'DELETE', params: { flow_type: flowTypes } }),
   getSettings: () => request('/settings'),
   updateSettings: (settings) => request('/settings', { method: 'PUT', body: settings }),
 }
