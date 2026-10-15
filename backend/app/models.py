@@ -6,9 +6,8 @@ positivo: el signo (ingreso o gasto) se deduce del tipo.
 
 Recurrencia según el tipo:
 * GFM / IFM: mensual desde `start_date`, indefinida o hasta `end_date`.
-* GVM: puntual, ocurre una sola vez en `start_date`.
-* IVM: puntual en `start_date`, o temporal (mensual) si se indica
-  `duration_months` o `end_date`.
+* GVM / IVM: puntual en `start_date`, o temporal (mensual) si se indica
+  `duration_months` o `end_date` (p. ej. una compra a plazos o el cobro de una deuda).
 """
 
 import enum
@@ -31,6 +30,10 @@ class FlowType(str, enum.Enum):
     def is_income(self) -> bool:
         return self in (FlowType.IFM, FlowType.IVM)
 
+    @property
+    def is_fixed(self) -> bool:
+        return self in (FlowType.GFM, FlowType.IFM)
+
 
 class Flow(Base):
     __tablename__ = "flows"
@@ -46,11 +49,9 @@ class Flow(Base):
 
     @property
     def is_recurring(self) -> bool:
-        if self.flow_type in (FlowType.GFM, FlowType.IFM):
+        if self.flow_type.is_fixed:
             return True
-        if self.flow_type == FlowType.IVM:
-            return self.duration_months is not None or self.end_date is not None
-        return False
+        return self.duration_months is not None or self.end_date is not None
 
     @property
     def signed_amount(self) -> Decimal:

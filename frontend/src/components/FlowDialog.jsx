@@ -16,13 +16,12 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useFinanceData } from '@/hooks/useFinanceData'
-import { FIXED_TYPES, FLOW_ORDER, FLOW_TYPES } from '@/lib/flowTypes'
+import { FIXED_TYPES, FLOW_ORDER, FLOW_TYPES, VARIABLE_TYPES } from '@/lib/flowTypes'
 import { toISODate } from '@/lib/format'
 
-
-// Periodicidad de un IVM: puntual o temporal (durante N meses / hasta una fecha).
-const IVM_MODES = [
-  { value: 'once', label: 'Puntual (un solo cobro)' },
+// Periodicidad de un flujo variable (GVM / IVM): puntual o temporal (durante N meses / hasta una fecha).
+const variableModes = (income) => [
+  { value: 'once', label: income ? 'Puntual (un solo cobro)' : 'Puntual (un solo pago)' },
   { value: 'months', label: 'Mensual durante N meses' },
   { value: 'until', label: 'Mensual hasta una fecha' },
 ]
@@ -36,7 +35,7 @@ function initialForm(flow, defaultType) {
       start_date: flow.start_date,
       end_date: flow.end_date ?? '',
       duration_months: flow.duration_months ?? '',
-      ivmMode: flow.duration_months ? 'months' : flow.end_date ? 'until' : 'once',
+      variableMode: flow.duration_months ? 'months' : flow.end_date ? 'until' : 'once',
     }
   }
   return {
@@ -46,7 +45,7 @@ function initialForm(flow, defaultType) {
     start_date: toISODate(new Date()),
     end_date: '',
     duration_months: '',
-    ivmMode: 'once',
+    variableMode: 'once',
   }
 }
 
@@ -62,9 +61,9 @@ function toPayload(form) {
   }
   if (FIXED_TYPES.includes(form.flow_type)) {
     payload.end_date = form.end_date || null
-  } else if (form.flow_type === 'IVM' && form.ivmMode === 'months') {
+  } else if (form.variableMode === 'months') {
     payload.duration_months = Number(form.duration_months)
-  } else if (form.flow_type === 'IVM' && form.ivmMode === 'until') {
+  } else if (form.variableMode === 'until') {
     payload.end_date = form.end_date
   }
   return payload
@@ -72,7 +71,7 @@ function toPayload(form) {
 
 function startDateLabel(form) {
   const type = FLOW_TYPES[form.flow_type]
-  const recurring = FIXED_TYPES.includes(form.flow_type) || (form.flow_type === 'IVM' && form.ivmMode !== 'once')
+  const recurring = FIXED_TYPES.includes(form.flow_type) || form.variableMode !== 'once'
   if (!recurring) return 'Fecha'
   return type.income ? 'Primer cobro' : 'Primer pago'
 }
@@ -95,6 +94,7 @@ function FlowForm({ flow, defaultType, onDone }) {
   const [confirmingDelete, setConfirmingDelete] = useState(false)
 
   const type = FLOW_TYPES[form.flow_type]
+  const variable = VARIABLE_TYPES.includes(form.flow_type)
   const set = (field) => (eventOrValue) =>
     setForm((current) => ({ ...current, [field]: eventOrValue?.target ? eventOrValue.target.value : eventOrValue }))
 
@@ -170,7 +170,10 @@ function FlowForm({ flow, defaultType, onDone }) {
         </Field>
 
         <div className="grid grid-cols-2 gap-4">
-          <Field label={form.flow_type === 'GFM' || form.flow_type === 'IFM' ? 'Importe mensual (€)' : 'Importe (€)'} htmlFor="flow-amount">
+          <Field
+            label={FIXED_TYPES.includes(form.flow_type) || form.variableMode !== 'once' ? 'Importe mensual (€)' : 'Importe (€)'}
+            htmlFor="flow-amount"
+          >
             <Input
               id="flow-amount"
               type="number"
@@ -200,14 +203,14 @@ function FlowForm({ flow, defaultType, onDone }) {
           </Field>
         )}
 
-        {form.flow_type === 'IVM' && (
-          <Field label="Periodicidad" htmlFor="flow-ivm-mode">
-            <Select value={form.ivmMode} onValueChange={set('ivmMode')}>
-              <SelectTrigger id="flow-ivm-mode">
+        {variable && (
+          <Field label="Periodicidad" htmlFor="flow-variable-mode">
+            <Select value={form.variableMode} onValueChange={set('variableMode')}>
+              <SelectTrigger id="flow-variable-mode">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {IVM_MODES.map((mode) => (
+                {variableModes(type.income).map((mode) => (
                   <SelectItem key={mode.value} value={mode.value}>
                     {mode.label}
                   </SelectItem>
@@ -217,8 +220,12 @@ function FlowForm({ flow, defaultType, onDone }) {
           </Field>
         )}
 
-        {form.flow_type === 'IVM' && form.ivmMode === 'months' && (
-          <Field label="Duración (meses)" htmlFor="flow-duration" hint="Ej.: 40 € al mes durante 10 meses.">
+        {variable && form.variableMode === 'months' && (
+          <Field
+            label="Duración (meses)"
+            htmlFor="flow-duration"
+            hint={type.income ? 'Ej.: 40 € al mes durante 10 meses.' : 'Ej.: una consola financiada a 200 € al mes durante 3 meses.'}
+          >
             <Input
               id="flow-duration"
               type="number"
@@ -233,8 +240,8 @@ function FlowForm({ flow, defaultType, onDone }) {
           </Field>
         )}
 
-        {form.flow_type === 'IVM' && form.ivmMode === 'until' && (
-          <Field label="Último cobro" htmlFor="flow-until">
+        {variable && form.variableMode === 'until' && (
+          <Field label={type.income ? 'Último cobro' : 'Último pago'} htmlFor="flow-until">
             <Input
               id="flow-until"
               type="date"
