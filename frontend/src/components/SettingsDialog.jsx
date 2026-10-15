@@ -23,8 +23,8 @@ import { Switch } from '@/components/ui/switch'
 import { useAuth } from '@/hooks/useAuth'
 import { useFinanceData } from '@/hooks/useFinanceData'
 import { useTheme } from '@/hooks/useTheme'
-import { formatDate, formatEURWhole, toISODate } from '@/lib/format'
-import { investmentOf } from '@/lib/investment'
+import { formatDate, formatEURWhole, formatMonthYear, toISODate } from '@/lib/format'
+import { contributionPlan, investmentOf } from '@/lib/investment'
 import { cn } from '@/lib/utils'
 
 function SwitchSetting({ id, label, description, checked, onCheckedChange }) {
@@ -382,26 +382,93 @@ function GoalSetting() {
 }
 
 /**
- * Inversión: lo invertido hoy, la aportación mensual y la rentabilidad anual esperada. Al abrir,
- * «Invertido hoy» ya trae lo que valdría hoy lo guardado (con lo que ha rendido y aportado), y al
- * guardar se toma esa cifra como punto de partida con fecha de hoy.
+ * Plan de aportaciones según lo escrito en el formulario: cuánto se puede aportar como mucho
+ * todos los meses (lo que sobra el mes más justo) y, mes a mes, lo que sobra y lo que se aporta.
+ */
+function ContributionPlan({ plan, monthly, until, onUseMax }) {
+  if (!plan.rows.length) return null
+  const period = until ? `hasta ${formatMonthYear(plan.rows.at(-1).month)}` : 'los próximos 12 meses'
+  const short = plan.max !== null && monthly > plan.max
+  return (
+    <div className="bg-muted/60 grid gap-2 rounded-lg px-3.5 py-3 text-xs">
+      <p className="m-0 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+        <span className="text-muted-foreground">
+          Como mucho, {period}:{' '}
+          <span className="text-foreground font-semibold tabular-nums">
+            {plan.max === null ? '—' : `${formatEURWhole(plan.max)}/mes`}
+          </span>
+        </span>
+        {plan.max !== null && plan.max > 0 && monthly !== plan.max && (
+          <button type="button" onClick={onUseMax} className="text-chart-1 font-medium hover:underline">
+            Usar el máximo
+          </button>
+        )}
+      </p>
+      {short && (
+        <p className="text-expense m-0 leading-relaxed">
+          Algunos meses no te sobra tanto: esos meses se aporta solo lo que sobre.
+        </p>
+      )}
+      <details className="group">
+        <summary className="text-muted-foreground hover:text-foreground cursor-pointer select-none">
+          Mes a mes · {formatEURWhole(plan.total)} en total
+        </summary>
+        <table className="mt-2 w-full tabular-nums">
+          <thead className="text-muted-foreground">
+            <tr>
+              <th className="py-1 text-left font-normal">Mes</th>
+              <th className="py-1 text-right font-normal">Te sobra</th>
+              <th className="py-1 text-right font-normal">Aportas</th>
+            </tr>
+          </thead>
+          <tbody>
+            {plan.rows.map((row) => (
+              <tr key={row.month} className="border-t">
+                <td className="py-1">{formatMonthYear(row.month)}</td>
+                <td className="text-muted-foreground py-1 text-right">
+                  {row.available === null ? '—' : formatEURWhole(row.available)}
+                </td>
+                <td className={cn('py-1 text-right', row.contribution < monthly && 'text-expense')}>
+                  {formatEURWhole(row.contribution)}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </details>
+    </div>
+  )
+}
+
+/**
+ * Inversión: lo invertido hoy, la rentabilidad anual esperada, la aportación mensual y, si se
+ * quiere, hasta cuándo se aporta. Al abrir, «Invertido hoy» ya trae lo que valdría hoy lo guardado
+ * (con lo que ha rendido y aportado), y al guardar se toma esa cifra como punto de partida con
+ * fecha de hoy. Debajo de la aportación, el plan: lo máximo que se puede aportar y el mes a mes.
  */
 function InvestmentForm({ settings }) {
-  const { refresh, investmentValueAt } = useFinanceData()
+  const { refresh, investmentValueAt, surplus } = useFinanceData()
   const [today] = useState(() => toISODate(new Date()))
   const current = investmentOf(settings)
   const [form, setForm] = useState(() => ({
     amount: current ? (investmentValueAt(today) ?? current.amount).toFixed(2) : '',
     monthly: current?.monthly ? String(current.monthly) : '',
     rate: current ? String(Number(settings.invest_return)) : '',
+    until: settings.invest_until ?? '',
   }))
   const [status, setStatus] = useState('idle') // idle | saving | saved
   const [error, setError] = useState(null)
-  const edit = (field) => (event) => {
-    setForm((f) => ({ ...f, [field]: event.target.value }))
+  const set = (field, value) => {
+    setForm((f) => ({ ...f, [field]: value }))
     setStatus('idle')
   }
+  const edit = (field) => (event) => set(field, event.target.value)
   const clean = (value) => String(value).trim().replace(',', '.')
+
+  const monthly = Number(clean(form.monthly)) || 0
+  const plan = surplus
+    ? contributionPlan({ monthly, date: today, until: form.until || null }, surplus)
+    : { rows: [], max: null, total: 0 }
 
   async function save(changes) {
     setStatus('saving')
@@ -423,55 +490,76 @@ function InvestmentForm({ settings }) {
       invest_monthly: clean(form.monthly) || '0',
       invest_return: clean(form.rate),
       invest_date: today,
+      invest_until: form.until || null,
     })
   }
 
   function handleRemove() {
-    setForm({ amount: '', monthly: '', rate: '' })
-    save({ invest_amount: null, invest_monthly: null, invest_return: null, invest_date: null })
+    setForm({ amount: '', monthly: '', rate: '', until: '' })
+    save({ invest_amount: null, invest_monthly: null, invest_return: null, invest_date: null, invest_until: null })
   }
 
   return (
     <form onSubmit={handleSubmit} className="grid gap-4">
-      <div className="grid gap-2">
-        <Label htmlFor="invest-amount">Invertido hoy (€)</Label>
-        <Input
-          id="invest-amount"
-          type="number"
-          inputMode="decimal"
-          min="0"
-          step="0.01"
-          value={form.amount}
-          onChange={edit('amount')}
-          required
-        />
+      <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-4">
+        <div className="grid gap-2">
+          <Label htmlFor="invest-amount">Invertido hoy (€)</Label>
+          <Input
+            id="invest-amount"
+            type="number"
+            inputMode="decimal"
+            min="0"
+            step="0.01"
+            value={form.amount}
+            onChange={edit('amount')}
+            required
+          />
+        </div>
+        <div className="grid gap-2">
+          <Label htmlFor="invest-return">Rentabilidad (%/año)</Label>
+          <Input
+            id="invest-return"
+            type="number"
+            inputMode="decimal"
+            min="-50"
+            max="50"
+            step="0.1"
+            value={form.rate}
+            onChange={edit('rate')}
+            required
+          />
+        </div>
       </div>
-      <div className="grid gap-2">
-        <Label htmlFor="invest-monthly">Aportas al mes (€)</Label>
-        <Input
-          id="invest-monthly"
-          type="number"
-          inputMode="decimal"
-          min="0"
-          step="0.01"
-          value={form.monthly}
-          onChange={edit('monthly')}
-        />
+      <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-4">
+        <div className="grid gap-2">
+          <Label htmlFor="invest-monthly">Aportas al mes (€)</Label>
+          <Input
+            id="invest-monthly"
+            type="number"
+            inputMode="decimal"
+            min="0"
+            step="0.01"
+            value={form.monthly}
+            onChange={edit('monthly')}
+          />
+        </div>
+        <div className="grid gap-2">
+          <Label htmlFor="invest-until">Hasta (opcional)</Label>
+          <Input
+            id="invest-until"
+            type="date"
+            min={today}
+            value={form.until}
+            onChange={edit('until')}
+          />
+        </div>
       </div>
-      <div className="grid gap-2">
-        <Label htmlFor="invest-return">Rentabilidad anual esperada (%)</Label>
-        <Input
-          id="invest-return"
-          type="number"
-          inputMode="decimal"
-          min="-50"
-          max="50"
-          step="0.1"
-          value={form.rate}
-          onChange={edit('rate')}
-          required
-        />
-      </div>
+      <ContributionPlan
+        plan={plan}
+        monthly={monthly}
+        until={form.until}
+        onUseMax={() => set('monthly', String(Math.floor(plan.max)))}
+      />
       {error && (
         <p role="alert" className="text-destructive text-sm">
           {error}
@@ -525,7 +613,7 @@ const PAGES = {
   investment: {
     title: 'Inversión',
     description:
-      'Qué parte de tu patrimonio está en fondos, acciones o similares (ya cuenta dentro de tu patrimonio: aquí solo dices cuánto está invertido). Solo esa parte crece con la rentabilidad; el resto, no. Lo que aportas cada mes sale de lo que te sobra ese mes (no es un gasto) y también rinde; nunca se invierte más de lo que sobra: si un mes sobra menos, se aporta solo eso, y si no sobra nada, ese mes no se aporta. La gráfica sigue mostrando el patrimonio total.',
+      'Qué parte de tu patrimonio está en fondos, acciones o similares (ya cuenta dentro de tu patrimonio). Solo esa parte crece con la rentabilidad. Cada mes se aporta lo que indiques, hasta la fecha que elijas, pero nunca más de lo que te sobra ese mes: debajo ves el máximo y el mes a mes.',
     Content: InvestmentSetting,
   },
   reset: {
@@ -604,7 +692,9 @@ function summaries(settings, chart) {
       : investment
         ? [
             formatEURWhole(investment.amount),
-            investment.monthly ? `${formatEURWhole(investment.monthly)}/mes` : null,
+            investment.monthly
+              ? `${formatEURWhole(investment.monthly)}/mes${investment.until ? ` hasta ${formatMonthYear(investment.until)}` : ''}`
+              : null,
             `${String(Number(settings.invest_return)).replace('.', ',')} %`,
           ]
             .filter(Boolean)
