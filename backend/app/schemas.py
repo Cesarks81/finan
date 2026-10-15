@@ -79,6 +79,7 @@ class SettingsPatch(BaseModel):
         default=None, description="Rentabilidad anual esperada, en %"
     )
     invest_date: date | None = Field(default=None, description="Fecha de invest_amount")
+    invest_until: date | None = Field(default=None, description="Último mes con aportación (sin ella, sin fin)")
 
 
 class SettingsRead(BaseModel):
@@ -92,6 +93,7 @@ class SettingsRead(BaseModel):
     invest_monthly: Decimal | None = None
     invest_return: Decimal | None = None
     invest_date: date | None = None
+    invest_until: date | None = None
 
 
 class Granularity(str, enum.Enum):

@@ -164,6 +164,7 @@ def load_settings(db: Session) -> models.Settings:
         invest_monthly=None,
         invest_return=None,
         invest_date=None,
+        invest_until=None,
     )
 
 

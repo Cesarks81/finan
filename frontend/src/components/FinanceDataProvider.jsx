@@ -42,13 +42,15 @@ export function FinanceDataProvider({ children }) {
   }, [nominal, settings.data, settings.error, realTerms, inflation])
   // Lo que vale la inversión en una fecha (con lo aportado y rendido desde que se guardó), para
   // que Ajustes muestre su valor de hoy. Null sin inversión o sin proyecciones.
+  // Lo que sobra cada mes según la API (el tope de cada aportación), también para Ajustes.
+  const surplus = useMemo(() => (nominal.data ? monthlySurplus(nominal.data) : null), [nominal.data])
   const investmentValueAt = useCallback(
     (iso) => {
       const investment = investmentOf(settings.data)
-      if (!investment || !nominal.data) return null
-      return investmentValue(investment, iso, monthlySurplus(nominal.data))
+      if (!investment || !surplus) return null
+      return investmentValue(investment, iso, surplus)
     },
-    [settings.data, nominal.data],
+    [settings.data, surplus],
   )
 
   const value = useMemo(
@@ -59,6 +61,7 @@ export function FinanceDataProvider({ children }) {
       flows,
       settings,
       investmentValueAt,
+      surplus,
       chart: { splitLines, setSplitLines, calendar, setCalendar, realTerms, setRealTerms, inflation, setInflation },
     }),
     [
@@ -68,6 +71,7 @@ export function FinanceDataProvider({ children }) {
       flows,
       settings,
       investmentValueAt,
+      surplus,
       splitLines,
       setSplitLines,
       calendar,

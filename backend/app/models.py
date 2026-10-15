@@ -65,7 +65,7 @@ class Settings(Base):
     movimientos de ese día. Sin fecha, es el patrimonio previo a cualquier flujo.
     `goal_name` y `goal_amount` son el objetivo de patrimonio (p. ej. «Entrada piso», 20.000 €).
     `invest_*` describen la parte invertida del patrimonio: lo invertido en `invest_date`, lo que
-    se aporta cada mes y la rentabilidad anual esperada (en %). Solo esa parte genera rentabilidad.
+    se aporta cada mes (hasta `invest_until`, si lo hay) y la rentabilidad anual esperada (en %). Solo esa parte genera rentabilidad.
     """
 
     __tablename__ = "settings"
@@ -79,6 +79,7 @@ class Settings(Base):
     invest_monthly: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), default=None)
     invest_return: Mapped[Decimal | None] = mapped_column(Numeric(5, 2), default=None)
     invest_date: Mapped[date | None] = mapped_column(Date, default=None)
+    invest_until: Mapped[date | None] = mapped_column(Date, default=None)
     updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
 
 
