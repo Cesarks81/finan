@@ -1,10 +1,5 @@
 const eur = new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' })
-const eurCompact = new Intl.NumberFormat('es-ES', {
-  style: 'currency',
-  currency: 'EUR',
-  notation: 'compact',
-  maximumFractionDigits: 1,
-})
+const compactNumber = new Intl.NumberFormat('es-ES', { maximumFractionDigits: 1 })
 const dayMonth = new Intl.DateTimeFormat('es-ES', { day: 'numeric', month: 'short' })
 const fullDate = new Intl.DateTimeFormat('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })
 const monthShort = new Intl.DateTimeFormat('es-ES', { month: 'short', year: '2-digit' })
@@ -28,7 +23,14 @@ const pointsSigned = new Intl.NumberFormat('es-ES', {
 export const formatPointsSigned = (ratio) => `${pointsSigned.format(ratio * 100)} p.p.`
 /** Proporción (0,132) como porcentaje con signo: «+13,2 %». */
 export const formatPercentSigned = (ratio) => percentSigned.format(ratio)
-export const formatEURCompact = (value) => eurCompact.format(Number(value))
+/** Importe abreviado para los ejes, con K y M en vez de «mil» y «M»: «500 €», «12,5K €», «1,2M €». */
+export function formatEURCompact(value) {
+  const amount = Number(value)
+  const size = Math.abs(amount)
+  if (size >= 1e6) return `${compactNumber.format(amount / 1e6)}M €`
+  if (size >= 1e3) return `${compactNumber.format(amount / 1e3)}K €`
+  return `${compactNumber.format(amount)} €`
+}
 
 /** 'YYYY', 'YYYY-MM' o 'YYYY-MM-DD' → Date local (sin desfase de zona horaria). */
 export function parseISODate(value) {
