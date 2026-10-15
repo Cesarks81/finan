@@ -155,7 +155,15 @@ SETTINGS_ID = 1
 def load_settings(db: Session) -> models.Settings:
     """Ajustes guardados o, si aún no existen, los valores por defecto (sin persistir)."""
     return db.get(models.Settings, SETTINGS_ID) or models.Settings(
-        id=SETTINGS_ID, initial_balance=Decimal(0), balance_date=None, goal_name=None, goal_amount=None
+        id=SETTINGS_ID,
+        initial_balance=Decimal(0),
+        balance_date=None,
+        goal_name=None,
+        goal_amount=None,
+        invest_amount=None,
+        invest_monthly=None,
+        invest_return=None,
+        invest_date=None,
     )
 
 
@@ -177,7 +185,7 @@ def update_settings(payload: schemas.SettingsUpdate, db: DbSession) -> models.Se
 
 @private.patch("/settings", response_model=schemas.SettingsRead, tags=["ajustes"])
 def patch_settings(payload: schemas.SettingsPatch, db: DbSession) -> models.Settings:
-    """Cambia solo los ajustes enviados (p. ej. el ahorro mensual)."""
+    """Cambia solo los ajustes enviados (p. ej. el objetivo o la inversión)."""
     settings = db.merge(load_settings(db))
     for field, value in payload.model_dump(exclude_unset=True).items():
         setattr(settings, field, value)

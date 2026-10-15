@@ -69,6 +69,16 @@ class SettingsPatch(BaseModel):
     goal_amount: Annotated[Decimal, Field(gt=0, max_digits=14, decimal_places=2)] | None = Field(
         default=None, description="Patrimonio que se quiere alcanzar"
     )
+    invest_amount: Annotated[Decimal, Field(ge=0, max_digits=14, decimal_places=2)] | None = Field(
+        default=None, description="Lo que hay invertido en invest_date"
+    )
+    invest_monthly: Annotated[Decimal, Field(ge=0, max_digits=12, decimal_places=2)] | None = Field(
+        default=None, description="Lo que se aporta a la inversión cada mes (sale de lo ahorrado)"
+    )
+    invest_return: Annotated[Decimal, Field(ge=-50, le=50, max_digits=5, decimal_places=2)] | None = Field(
+        default=None, description="Rentabilidad anual esperada, en %"
+    )
+    invest_date: date | None = Field(default=None, description="Fecha de invest_amount")
 
 
 class SettingsRead(BaseModel):
@@ -78,6 +88,10 @@ class SettingsRead(BaseModel):
     balance_date: date | None
     goal_name: str | None = None
     goal_amount: Decimal | None = None
+    invest_amount: Decimal | None = None
+    invest_monthly: Decimal | None = None
+    invest_return: Decimal | None = None
+    invest_date: date | None = None
 
 
 class Granularity(str, enum.Enum):
