@@ -216,7 +216,7 @@ function FlowForm({ flow, defaultType, onDone }) {
         {/* Primero el importe (el cursor empieza ahí: en móvil sale el teclado numérico, más bajo)
             y la fecha; después el concepto. Columnas que pueden encoger: en iOS el campo de fecha
             tiene un ancho mínimo y se salía por la derecha. */}
-        <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-4">
+        <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] items-end gap-4">
           <Field
             label={FIXED_TYPES.includes(form.flow_type) || form.variableMode !== 'once' ? 'Importe mensual (€)' : 'Importe (€)'}
             htmlFor="flow-amount"

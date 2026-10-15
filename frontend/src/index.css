@@ -121,11 +121,19 @@
   pointer-events: none;
 }
 
-/* iOS da a los campos de fecha un ancho mínimo propio: en una columna estrecha se salían por la
-   derecha y el modal se podía arrastrar de lado. Que encojan como el resto y alineen a la izquierda. */
+/* Campos de fecha en iOS: con su aspecto nativo, Safari no respeta el ancho ni el alto del campo
+   (en una columna estrecha se salía por la derecha y, vacío, quedaba más alto que los demás).
+   Sin aspecto nativo encogen como el resto y toman el alto de `Input`; al tocarlos sigue saliendo
+   el selector de fecha del sistema. El valor (o el hueco si está vacío) alinea a la izquierda y
+   tiene alto propio, porque vacío iOS lo deja sin alto. */
 input[type='date'] {
+  -webkit-appearance: none;
+  appearance: none;
   min-width: 0;
+  max-width: 100%;
 }
 input[type='date']::-webkit-date-and-time-value {
+  min-height: 1.5em;
+  margin: 0;
   text-align: left;
 }
