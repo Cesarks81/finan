@@ -5,7 +5,6 @@ import { FlowButtons } from '@/components/FlowButtons'
 import { FlowDialog } from '@/components/FlowDialog'
 import { GoalCard } from '@/components/GoalCard'
 import { HistoryTable } from '@/components/HistoryTable'
-import { MonthlyBudget } from '@/components/MonthlyBudget'
 import { ReviewDialog, ReviewReminder } from '@/components/MonthlyReview'
 import { NetWorthChart } from '@/components/NetWorthChart'
 import { SettingsDialog } from '@/components/SettingsDialog'
@@ -79,7 +78,6 @@ export function Dashboard() {
         <h1 className="sr-only text-2xl font-bold tracking-tight md:not-sr-only">finan</h1>
         <div className="flex items-center gap-4">
           <PortfolioValue />
-          {isDesktop && <MonthlyBudget pill onSetup={() => setSettingsOpen(true)} />}
           <Button
             variant="ghost"
             size="icon"
@@ -92,7 +90,6 @@ export function Dashboard() {
           </Button>
         </div>
       </header>
-      {!isDesktop && <MonthlyBudget onSetup={() => setSettingsOpen(true)} className="-mt-2" />}
 
       <main className="flex min-h-0 flex-1 flex-col gap-4 md:grid md:flex-none md:grid-cols-[minmax(0,1fr)_15rem] md:grid-rows-[auto_auto] md:gap-6 lg:grid-cols-[minmax(0,1fr)_18rem]">
         <NetWorthChart className="min-h-0 flex-1 md:col-start-1 md:row-start-1 md:flex-none" />

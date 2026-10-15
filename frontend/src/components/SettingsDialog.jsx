@@ -448,14 +448,14 @@ export function SettingsDialog({ open, onOpenChange }) {
 
         <Section
           title="Objetivo"
-          description="El patrimonio al que quieres llegar (un colchón, la entrada de un piso…). finan te dice cuándo llegas y, al añadir un gasto o un ingreso, cuánto lo adelanta o lo retrasa."
+          description="El patrimonio al que quieres llegar (un colchón, la entrada de un piso…). finan lo marca en la gráfica con una línea azul, te dice cuándo llegas y, al añadir un gasto o un ingreso, cuánto lo adelanta o lo retrasa."
         >
           <GoalSetting />
         </Section>
 
         <Section
           title="Ahorro mensual"
-          description="Lo que quieres apartar cada mes, antes de gastar. «Disponible este mes» es lo que te queda para gastos variables: ingresos del mes − gastos fijos − este ahorro − lo que ya has gastado. Déjalo vacío para no usarlo."
+          description="Lo que quieres apartar cada mes, antes de gastar. Al añadir o editar un flujo, «Así te afecta» te dice cuánto te queda este mes para gastos variables: ingresos del mes − gastos fijos − este ahorro − lo que ya has gastado. Déjalo vacío para no usarlo."
         >
           <SavingsTargetSetting />
         </Section>
