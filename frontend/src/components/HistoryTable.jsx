@@ -130,14 +130,10 @@ export function HistoryTable({ onEdit, className }) {
                       <TableCell className="max-w-0 truncate font-medium" title={flow.concept}>
                         {flow.concept}
                       </TableCell>
-                      <TableCell className="text-muted-foreground" title={schedule.hint}>
-                        {schedule.recurring ? (
-                          <Badge variant="outline" className="text-muted-foreground font-normal">
-                            {schedule.label}
-                          </Badge>
-                        ) : (
-                          schedule.label
-                        )}
+                      <TableCell title={schedule.hint}>
+                        <Badge variant="outline" className="text-muted-foreground font-normal">
+                          {schedule.label}
+                        </Badge>
                       </TableCell>
                       <TableCell
                         className={cn('text-right tabular-nums', income ? 'text-income' : 'text-expense')}
