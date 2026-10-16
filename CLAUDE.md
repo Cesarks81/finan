@@ -66,6 +66,7 @@ Aplicación web progresiva (PWA) de finanzas personales minimalista orientada a 
 ├── vercel.json             # Build del frontend, función Python y reescritura /api/*
 ├── requirements.txt        # Dependencias Python (las usa Vercel; backend/requirements.txt remite aquí)
 ├── DEPLOY.md               # Guía de despliegue en Vercel + Neon
+├── claude_handoff.md       # Traspaso entre sesiones de Claude: forma de trabajar, cómo probar, estado y pendientes
 ├── backend/
 │   ├── app/
 │   │   ├── models.py       # Modelos SQLAlchemy: Flow (tabla única; tipo GFM/GVM/IFM/IVM), Settings y LoginAttempt
