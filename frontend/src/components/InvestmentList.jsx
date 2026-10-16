@@ -16,23 +16,16 @@ import { Button, buttonVariants } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { useFinanceData } from '@/hooks/useFinanceData'
 import { useIsDesktop } from '@/hooks/useMediaQuery'
-import { formatEURWhole, formatMonthYear, toISODate } from '@/lib/format'
-
-const percent = (rate) => `${String(Math.round(rate * 1000) / 10).replace('.', ',')} %`
-
-/** Lo que aporta y hasta cuándo: «700 €/mes hasta dic 2027», «Sin aportaciones». */
-function contributionText(investment) {
-  if (!investment.monthly) return 'Sin aportaciones'
-  const until = investment.until ? ` hasta ${formatMonthYear(investment.until.slice(0, 7))}` : ''
-  return `${formatEURWhole(investment.monthly)}/mes${until}`
-}
+import { formatEURWhole, toISODate } from '@/lib/format'
+import { contributionText, percent } from '@/lib/investment'
 
 /**
  * Inversiones (pestaña junto al Historial): cada una con lo que vale hoy, lo que aporta al mes y su
- * rentabilidad. En PC, tabla con editar y eliminar (y el total si hay varias); en móvil, lista en
- * la que tocar una fila la abre para editarla o eliminarla. Sin inversiones, invita a añadir una.
+ * rentabilidad. Tocar una abre su detalle mes a mes (`onOpen`). En PC, tabla con editar y eliminar
+ * en cada fila (y el total si hay varias); en móvil, lista (editar y eliminar están en el detalle).
+ * Sin inversiones, invita a añadir una (`onEdit(null)`).
  */
-export function InvestmentList({ onEdit }) {
+export function InvestmentList({ onOpen, onEdit }) {
   const isDesktop = useIsDesktop()
   const { investments, wallet, refresh } = useFinanceData()
   const [today] = useState(() => toISODate(new Date()))
@@ -85,7 +78,7 @@ export function InvestmentList({ onEdit }) {
             <li key={investment.id}>
               <button
                 type="button"
-                onClick={() => onEdit(rowOf(investment))}
+                onClick={() => onOpen(rowOf(investment))}
                 className="flex w-full items-center gap-3 py-3 text-left"
               >
                 <span className="grid min-w-0 flex-1 gap-1">
@@ -121,9 +114,12 @@ export function InvestmentList({ onEdit }) {
           </TableHeader>
           <TableBody>
             {list.map((investment) => (
-              <TableRow key={investment.id}>
+              <TableRow key={investment.id} onClick={() => onOpen(rowOf(investment))} className="cursor-pointer">
                 <TableCell className="max-w-0 truncate font-medium" title={investment.name}>
-                  {investment.name}
+                  {/* Botón para abrirla con el teclado; el clic sube a la fila. */}
+                  <button type="button" className="max-w-full truncate text-left">
+                    {investment.name}
+                  </button>
                 </TableCell>
                 <TableCell className="text-muted-foreground">{contributionText(investment)}</TableCell>
                 <TableCell className="text-muted-foreground text-right tabular-nums">
@@ -131,7 +127,8 @@ export function InvestmentList({ onEdit }) {
                 </TableCell>
                 <TableCell className="text-right font-medium tabular-nums">{formatEURWhole(valueOf(investment))}</TableCell>
                 <TableCell>
-                  <div className="flex justify-end gap-1">
+                  {/* Los botones no abren el detalle: tienen su propia acción. */}
+                  <div className="flex justify-end gap-1" onClick={(event) => event.stopPropagation()}>
                     <Button
                       variant="ghost"
                       size="icon-sm"

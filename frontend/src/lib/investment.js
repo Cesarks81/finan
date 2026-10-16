@@ -1,5 +1,5 @@
 import { flowDates, FLOW_TYPES } from '@/lib/flowTypes'
-import { parseISODate, toISODate } from '@/lib/format'
+import { formatEURWhole, formatMonthYear, parseISODate, toISODate } from '@/lib/format'
 
 const DAY = 86_400_000
 const years = (from, to) => (parseISODate(to) - parseISODate(from)) / DAY / 365.25
@@ -15,6 +15,16 @@ export function investmentOf(row) {
     date: row.start_date,
     until: row.until ?? null,
   }
+}
+
+/** Rentabilidad para mostrar: 0,05 → «5 %». */
+export const percent = (rate) => `${String(Math.round(rate * 1000) / 10).replace('.', ',')} %`
+
+/** Lo que aporta y hasta cuándo: «700 €/mes hasta dic 2027», «Sin aportaciones». */
+export function contributionText(investment) {
+  if (!investment.monthly) return 'Sin aportaciones'
+  const until = investment.until ? ` hasta ${formatMonthYear(investment.until.slice(0, 7))}` : ''
+  return `${formatEURWhole(investment.monthly)}/mes${until}`
 }
 
 // Aportaciones hasta `iso`: una el día 1 de cada mes desde el siguiente a `date`.
@@ -160,9 +170,31 @@ function gainsOf(investment, at, iso) {
 }
 
 /**
+ * Evolución de una inversión mes a mes desde `from` ('YYYY-MM-DD', normalmente hoy), `count`
+ * meses: el primero va de `from` al final de su mes y los demás, del día 1 al último. Cada mes,
+ * lo que se aporta (el día 1), lo que gana (lo que vale al final menos lo del mes anterior y lo
+ * aportado: la ganancia de cada mes rinde los siguientes) y lo que vale al acabar.
+ */
+function monthByMonth(investment, from, count, valueAt, contributionOf) {
+  const start = parseISODate(from)
+  const rows = []
+  let previous = valueAt(from)
+  for (let k = 0; k < count; k++) {
+    const end = toISODate(new Date(start.getFullYear(), start.getMonth() + k + 1, 0))
+    const first = monthStart(start, k)
+    const contribution = k === 0 ? 0 : contributionOf(first)
+    const value = valueAt(end)
+    rows.push({ month: end.slice(0, 7), contribution, gain: value - previous - contribution, value })
+    previous = value
+  }
+  return rows
+}
+
+/**
  * Cartera: las inversiones (`investmentOf`) con lo que sobra cada mes (`monthlySurplus`), que se
  * reparte entre sus aportaciones (`allocator`).
  * - `value(investment, iso)`: lo que vale una en esa fecha (antes de su fecha, lo invertido).
+ * - `months(investment, from, count)`: su evolución mes a mes (`monthByMonth`).
  * - `adjust(balanceDate)`: lo que la rentabilidad de todas suma al patrimonio en cada fecha
  *   (función fecha → €). El patrimonio inicial ya incluye lo ganado hasta su fecha
  *   (`balance_date`): como con los flujos, se suma lo que rinde desde entonces y, antes de esa
@@ -175,6 +207,10 @@ export function portfolio(investments, surplus) {
   )
   return {
     value: (investment, iso) => calculators.get(investment)(iso).value,
+    months: (investment, from, count) =>
+      monthByMonth(investment, from, count, (iso) => calculators.get(investment)(iso).value, (when) =>
+        allocate(investment, when),
+      ),
     adjust(balanceDate) {
       const parts = investments.map((investment) => {
         const at = calculators.get(investment)

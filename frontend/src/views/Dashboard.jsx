@@ -5,6 +5,7 @@ import { FlowButtons } from '@/components/FlowButtons'
 import { FlowDialog } from '@/components/FlowDialog'
 import { GoalCard } from '@/components/GoalCard'
 import { HistoryTable } from '@/components/HistoryTable'
+import { InvestmentDetail } from '@/components/InvestmentDetail'
 import { InvestmentDialog } from '@/components/InvestmentDialog'
 import { ReviewDialog, ReviewReminder } from '@/components/MonthlyReview'
 import { NetWorthChart } from '@/components/NetWorthChart'
@@ -53,6 +54,9 @@ export function Dashboard() {
   const openSettings = (page = null) => setSettings((current) => ({ open: true, page, key: current.key + 1 }))
   const [investment, setInvestment] = useState({ open: false, row: null, key: 0 })
   const openInvestment = (row) => setInvestment((current) => ({ open: true, row, key: current.key + 1 }))
+  // Detalle de una inversión (mes a mes); en móvil, desde él se edita o se elimina.
+  const [detail, setDetail] = useState({ open: false, row: null, key: 0 })
+  const openDetail = (row) => setDetail((current) => ({ open: true, row, key: current.key + 1 }))
   const [review, setReview] = useState({ open: false, key: 0 })
   const monthlyReview = useMonthlyReview()
   const openReview = () => setReview((current) => ({ open: true, key: current.key + 1 }))
@@ -114,6 +118,7 @@ export function Dashboard() {
           />
           <HistoryTable
             onEdit={openEdit}
+            onOpenInvestment={openDetail}
             onEditInvestment={openInvestment}
             className={cn(
               'bg-background absolute inset-0 md:static md:col-start-1 md:row-start-2 md:flex',
@@ -137,6 +142,16 @@ export function Dashboard() {
         flow={dialog.flow}
         defaultType={dialog.type}
         formKey={dialog.key}
+      />
+      <InvestmentDetail
+        open={detail.open}
+        onOpenChange={(open) => setDetail((current) => ({ ...current, open }))}
+        investment={detail.row}
+        onEdit={(row) => {
+          setDetail((current) => ({ ...current, open: false }))
+          openInvestment(row)
+        }}
+        formKey={detail.key}
       />
       <InvestmentDialog
         open={investment.open}

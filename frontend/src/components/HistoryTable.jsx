@@ -135,7 +135,7 @@ function SectionTabs({ value, onChange }) {
  * inversiones (`InvestmentList`). En PC va debajo de la gráfica, como tabla; en móvil ocupa su
  * propia pantalla (botón del encabezado), como lista.
  */
-export function HistoryTable({ onEdit, onEditInvestment, className }) {
+export function HistoryTable({ onEdit, onOpenInvestment, onEditInvestment, className }) {
   const isDesktop = useIsDesktop()
   const { refresh, flows, investments } = useFinanceData()
   const [section, setSection] = useState('history')
@@ -201,7 +201,7 @@ export function HistoryTable({ onEdit, onEditInvestment, className }) {
       </CardHeader>
       <CardContent className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 md:overflow-visible md:px-6">
         {showInvestments ? (
-          <InvestmentList onEdit={onEditInvestment} />
+          <InvestmentList onOpen={onOpenInvestment} onEdit={onEditInvestment} />
         ) : (
           <>
             {(error || deleteError) && (
