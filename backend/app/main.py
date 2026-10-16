@@ -195,6 +195,32 @@ def patch_settings(payload: schemas.SettingsPatch, db: DbSession) -> models.Sett
     return settings
 
 
+# --- Copia de seguridad --------------------------------------------------------
+
+
+@private.get("/backup", response_model=schemas.Backup, tags=["copia de seguridad"])
+def export_backup(db: DbSession) -> schemas.Backup:
+    """Todos los datos (ajustes y flujos) para guardarlos en un archivo."""
+    flows = db.scalars(select(models.Flow).order_by(models.Flow.id))
+    return schemas.Backup(
+        exported_on=date.today(),
+        settings=schemas.BackupSettings.model_validate(load_settings(db), from_attributes=True),
+        flows=[schemas.FlowCreate.model_validate(flow, from_attributes=True) for flow in flows],
+    )
+
+
+@private.put("/backup", response_model=schemas.BackupResult, tags=["copia de seguridad"])
+def import_backup(payload: schemas.Backup, db: DbSession) -> schemas.BackupResult:
+    """Sustituye todos los datos por los de la copia, de una vez: si algo falla, no cambia nada."""
+    db.execute(delete(models.Flow))
+    db.add_all(models.Flow(**flow.model_dump()) for flow in payload.flows)
+    settings = db.merge(load_settings(db))
+    for field, value in payload.settings.model_dump().items():
+        setattr(settings, field, value)
+    db.commit()
+    return schemas.BackupResult(flows=len(payload.flows))
+
+
 # --- Proyección de patrimonio ------------------------------------------------
 
 

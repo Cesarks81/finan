@@ -3,7 +3,7 @@
 import enum
 from datetime import date, datetime
 from decimal import Decimal
-from typing import Annotated
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -94,6 +94,30 @@ class SettingsRead(BaseModel):
     invest_return: Decimal | None = None
     invest_date: date | None = None
     invest_until: date | None = None
+
+
+class BackupSettings(SettingsPatch):
+    """Ajustes guardados en una copia de seguridad: todos, con las mismas reglas que al editarlos."""
+
+    initial_balance: Balance = Decimal(0)
+    balance_date: date | None = None
+
+
+class Backup(BaseModel):
+    """Copia de seguridad completa: los ajustes guardados y todos los flujos.
+
+    Las preferencias de cada dispositivo (modo oscuro, opciones de la gráfica) no van en ella.
+    """
+
+    app: Literal["finan"] = "finan"
+    version: Literal[1] = 1
+    exported_on: date | None = Field(default=None, description="Día en que se hizo la copia")
+    settings: BackupSettings
+    flows: list[FlowCreate] = Field(max_length=10_000)
+
+
+class BackupResult(BaseModel):
+    flows: int = Field(description="Número de flujos importados")
 
 
 class Granularity(str, enum.Enum):

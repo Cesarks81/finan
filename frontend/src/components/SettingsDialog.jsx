@@ -4,12 +4,15 @@ import {
   Check,
   ChevronLeft,
   ChevronRight,
+  DatabaseBackup,
+  Download,
   LoaderCircle,
   LogOut,
   Moon,
   RotateCcw,
   Target,
   TrendingUp,
+  Upload,
   Wallet,
 } from 'lucide-react'
 
@@ -21,8 +24,9 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { useAuth } from '@/hooks/useAuth'
-import { useFinanceData } from '@/hooks/useFinanceData'
+import { useApiQuery, useFinanceData } from '@/hooks/useFinanceData'
 import { useTheme } from '@/hooks/useTheme'
+import { backupFile, readBackup, saveFile } from '@/lib/backup'
 import { formatDate, formatEURWhole, formatMonthYear, toISODate } from '@/lib/format'
 import { contributionPlan, investmentOf } from '@/lib/investment'
 import { cn } from '@/lib/utils'
@@ -287,6 +291,122 @@ function ResetSetting() {
             Restablecer…
           </Button>
         </div>
+      )}
+    </div>
+  )
+}
+
+/**
+ * Copia de seguridad: guardar en un archivo los ajustes y todos los flujos, o importar uno, que
+ * sustituye todos los datos tras confirmarlo. La copia se pide al abrir la pantalla para que el
+ * botón la guarde sin esperas (en el móvil, compartir solo se permite justo al tocar).
+ */
+function BackupSetting() {
+  const { version, refresh, flows } = useFinanceData()
+  const backup = useApiQuery(api.exportBackup, [version])
+  const input = useRef(null)
+  const [pending, setPending] = useState(null) // copia leída del archivo, a falta de confirmar
+  const [status, setStatus] = useState(null) // null | 'importing' | { imported }
+  const [error, setError] = useState(null)
+
+  async function handleChoose(event) {
+    const file = event.target.files?.[0]
+    event.target.value = '' // para poder volver a elegir el mismo archivo
+    if (!file) return
+    setPending(null)
+    setStatus(null)
+    setError(null)
+    try {
+      setPending(await readBackup(file))
+    } catch (err) {
+      setError(err.message)
+    }
+  }
+
+  async function handleImport() {
+    setStatus('importing')
+    setError(null)
+    try {
+      const { flows: imported } = await api.importBackup(pending)
+      refresh()
+      setPending(null)
+      setStatus({ imported })
+    } catch (err) {
+      // Si el archivo no vale, no tiene sentido reintentarlo; si falla la conexión, sí.
+      if (err.status === 422) setPending(null)
+      setError(err.status === 422 ? 'El archivo tiene datos que finan no acepta. No se ha cambiado nada.' : err.message)
+      setStatus(null)
+    }
+  }
+
+  return (
+    <div className="grid gap-3">
+      <div className="flex flex-wrap items-center gap-3 rounded-lg border p-3">
+        <div className="grid min-w-48 flex-1 gap-1">
+          <p className="text-sm font-medium">Exportar</p>
+          <p className="text-muted-foreground text-xs">
+            {backup.data ? `Tus ${flowCount(backup.data.flows.length)} y tus ajustes, en un archivo.` : 'Preparando la copia…'}
+          </p>
+        </div>
+        <Button variant="outline" onClick={() => saveFile(backupFile(backup.data))} disabled={!backup.data} className="ml-auto">
+          <Download />
+          Guardar copia
+        </Button>
+      </div>
+      {backup.error && (
+        <p role="alert" className="text-destructive text-sm">
+          {backup.error.message}
+        </p>
+      )}
+
+      <div className="grid gap-3 rounded-lg border p-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="grid min-w-48 flex-1 gap-1">
+            <p className="text-sm font-medium">Importar</p>
+            <p className="text-muted-foreground text-xs">Recupera una copia: sustituye todos tus datos por los suyos.</p>
+          </div>
+          <Button
+            variant="outline"
+            onClick={() => input.current.click()}
+            disabled={status === 'importing'}
+            className="ml-auto"
+          >
+            <Upload />
+            Elegir archivo…
+          </Button>
+          <input ref={input} type="file" accept=".json,application/json" onChange={handleChoose} className="hidden" />
+        </div>
+
+        {pending && (
+          <div className="border-destructive/40 grid gap-3 rounded-lg border p-3">
+            <p className="text-sm">
+              Copia {pending.exported_on ? `del ${formatDate(pending.exported_on)} ` : ''}con{' '}
+              {flowCount(pending.flows.length)}. Sustituirá todo lo que tienes ahora ({flowCount(flows.data?.length ?? 0)},
+              patrimonio inicial, objetivo e inversión). No se puede deshacer: si quieres conservarlo, guarda antes una
+              copia.
+            </p>
+            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <Button variant="outline" onClick={() => setPending(null)} disabled={status === 'importing'}>
+                No, cancelar
+              </Button>
+              <Button variant="destructive" onClick={handleImport} disabled={status === 'importing'}>
+                {status === 'importing' && <LoaderCircle className="animate-spin" />}
+                Sí, importar
+              </Button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {error && (
+        <p role="alert" className="text-destructive text-sm">
+          {error}
+        </p>
+      )}
+      {status?.imported !== undefined && (
+        <p role="status" className="text-income flex items-center justify-end gap-1 text-sm">
+          <Check className="size-4" /> Copia importada · {flowCount(status.imported)}
+        </p>
       )}
     </div>
   )
@@ -616,6 +736,12 @@ const PAGES = {
       'Qué parte de tu patrimonio está en fondos, acciones o similares (ya cuenta dentro de tu patrimonio). Solo esa parte crece con la rentabilidad. Cada mes se aporta lo que indiques, hasta la fecha que elijas, pero nunca más de lo que te sobra ese mes: debajo ves el máximo y el mes a mes.',
     Content: InvestmentSetting,
   },
+  backup: {
+    title: 'Copia de seguridad',
+    description:
+      'Guarda en un archivo tus flujos, el patrimonio inicial, el objetivo y la inversión, y recupéralos cuando quieras, en este dispositivo o en otro. El modo oscuro y las opciones de la gráfica no van en la copia: son de cada dispositivo.',
+    Content: BackupSetting,
+  },
   reset: {
     title: 'Restablecer datos',
     description: 'Elimina de golpe todos los gastos, todos los ingresos o ambos. El patrimonio inicial se mantiene.',
@@ -719,6 +845,12 @@ function Menu({ onOpen }) {
         <Row icon={TrendingUp} label="Inversión" summary={summary.investment} onClick={() => onOpen('investment')} />
       </Group>
       <Group title="Datos">
+        <Row
+          icon={DatabaseBackup}
+          label="Copia de seguridad"
+          summary="Exportar o importar tus datos"
+          onClick={() => onOpen('backup')}
+        />
         <Row
           icon={RotateCcw}
           label="Restablecer datos"
