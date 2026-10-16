@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { History, Settings } from 'lucide-react'
+import { History, Settings, TrendingUp } from 'lucide-react'
 
 import { FlowButtons } from '@/components/FlowButtons'
 import { FlowDialog } from '@/components/FlowDialog'
@@ -29,7 +29,8 @@ function PortfolioValue() {
       </span>
       <span
         className={cn(
-          'text-3xl font-semibold tracking-tight tabular-nums md:text-2xl',
+          // En móvil, algo más pequeña en pantallas estrechas para no chocar con los botones.
+          'text-[clamp(1.5rem,7.5vw,1.875rem)] font-semibold tracking-tight tabular-nums md:text-2xl',
           Number(balance) < 0 && 'text-expense',
         )}
       >
@@ -44,8 +45,9 @@ function PortfolioValue() {
  * - PC: encabezado con `finan` a la izquierda y el patrimonio + ajustes a la derecha; debajo,
  *   dos columnas: gráfica e History a la izquierda, los 4 botones de flujo a la derecha.
  * - Móvil: encabezado solo con el patrimonio (y ajustes), gráfica a todo el ancho y los
- *   4 botones apilados debajo. El botón de la izquierda del encabezado cambia los 4 botones
- *   por el Historial (en el mismo hueco, sin mover la gráfica), y vuelta.
+ *   4 botones apilados debajo. Los dos botones de la izquierda del encabezado cambian los 4
+ *   botones por el Historial o por las Inversiones (en el mismo hueco, sin mover la gráfica);
+ *   tocar otra vez el activo vuelve a los botones.
  */
 export function Dashboard() {
   const [dialog, setDialog] = useState({ open: false, flow: null, type: 'GVM', key: 0 })
@@ -60,10 +62,12 @@ export function Dashboard() {
   const [review, setReview] = useState({ open: false, key: 0 })
   const monthlyReview = useMonthlyReview()
   const openReview = () => setReview((current) => ({ open: true, key: current.key + 1 }))
-  // Solo en móvil: bajo la gráfica, los 4 botones o el Historial (en PC se ven siempre los dos).
-  const [showHistory, setShowHistory] = useState(false)
+  // Solo en móvil: bajo la gráfica, los 4 botones (null), el Historial ('history') o las
+  // Inversiones ('investments'). En PC se ven siempre los botones y el Historial, con pestañas.
+  const [panel, setPanel] = useState(null)
+  const togglePanel = (next) => setPanel((current) => (current === next ? null : next))
   const isDesktop = useIsDesktop()
-  const hiddenButtons = showHistory && !isDesktop
+  const hiddenButtons = panel !== null && !isDesktop
 
   const openDialog = (changes) => setDialog((current) => ({ ...current, ...changes, open: true, key: current.key + 1 }))
   const openCreate = (type) => openDialog({ flow: null, type })
@@ -72,20 +76,35 @@ export function Dashboard() {
   return (
     // Móvil: pantalla fija del alto de la ventana, sin scroll; la gráfica ocupa el espacio libre.
     <div className="mx-auto flex h-dvh w-full max-w-6xl flex-col gap-4 overflow-hidden px-4 pt-[max(1.25rem,env(safe-area-inset-top))] pb-[max(1.25rem,env(safe-area-inset-bottom))] md:h-auto md:min-h-dvh md:gap-8 md:overflow-visible md:px-6 md:pt-8 md:pb-8">
-      <header className="relative flex min-h-10 items-center justify-center px-12 md:justify-between md:px-0">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => setShowHistory((current) => !current)}
-          aria-pressed={showHistory}
-          aria-label="Historial"
-          title={showHistory ? 'Volver a los botones' : 'Ver historial'}
-          className={cn('absolute top-1/2 left-0 -translate-y-1/2 md:hidden', showHistory && 'bg-accent')}
-        >
-          <History className="size-5" />
-        </Button>
+      {/* Móvil: tres columnas (botones, patrimonio, ajustes) con las de los lados iguales, así que
+          la cifra queda centrada y, si no cabe, se aparta antes que tapar los botones. */}
+      <header className="relative grid min-h-10 grid-cols-[1fr_auto_1fr] items-center gap-2 md:flex md:justify-between">
+        <div className="flex gap-1 justify-self-start md:hidden">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => togglePanel('history')}
+            aria-pressed={panel === 'history'}
+            aria-label="Historial"
+            title={panel === 'history' ? 'Volver a los botones' : 'Ver historial'}
+            className={cn(panel === 'history' && 'bg-accent')}
+          >
+            <History className="size-5" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => togglePanel('investments')}
+            aria-pressed={panel === 'investments'}
+            aria-label="Inversiones"
+            title={panel === 'investments' ? 'Volver a los botones' : 'Ver inversiones'}
+            className={cn(panel === 'investments' && 'bg-accent')}
+          >
+            <TrendingUp className="size-5" />
+          </Button>
+        </div>
         <h1 className="sr-only text-2xl font-bold tracking-tight md:not-sr-only">finan</h1>
-        <div className="flex items-center gap-4">
+        <div className="contents md:flex md:items-center md:gap-4">
           <PortfolioValue />
           <Button
             variant="ghost"
@@ -93,7 +112,7 @@ export function Dashboard() {
             onClick={() => openSettings()}
             aria-label="Ajustes"
             title="Ajustes"
-            className="absolute top-1/2 right-0 -translate-y-1/2 md:static md:translate-y-0"
+            className="justify-self-end"
           >
             <Settings className="size-5" />
           </Button>
@@ -117,12 +136,14 @@ export function Dashboard() {
             className={cn('md:col-start-2 md:row-start-1 md:opacity-100', hiddenButtons && 'opacity-0')}
           />
           <HistoryTable
+            // En móvil, la sección la elige el botón del encabezado (sin pestañas).
+            section={isDesktop ? undefined : (panel ?? 'history')}
             onEdit={openEdit}
             onOpenInvestment={openDetail}
             onEditInvestment={openInvestment}
             className={cn(
               'bg-background absolute inset-0 md:static md:col-start-1 md:row-start-2 md:flex',
-              !showHistory && 'hidden',
+              !panel && 'hidden',
             )}
           />
         </div>
