@@ -157,6 +157,24 @@ export function HistoryTable({ onEdit, onOpenInvestment, onEditInvestment, class
     }
   }
 
+  const filterControl = (
+    <ToggleGroup
+      type="single"
+      size="sm"
+      variant="outline"
+      value={filterValue}
+      onValueChange={(next) => next && setFilterValue(next)}
+      aria-label="Filtrar el historial"
+      className={cn(!isDesktop && 'w-full')}
+    >
+      {FILTERS.map((f) => (
+        <ToggleGroupItem key={f.value} value={f.value} className="px-3 text-xs">
+          {f.label}
+        </ToggleGroupItem>
+      ))}
+    </ToggleGroup>
+  )
+
   return (
     <Card
       className={cn(
@@ -173,31 +191,21 @@ export function HistoryTable({ onEdit, onOpenInvestment, onEditInvestment, class
             <LoaderCircle className="text-muted-foreground size-3.5 animate-spin opacity-60" aria-label="Cargando" />
           )}
         </CardTitle>
-        <CardAction>
-          {showInvestments ? (
-            investments.list?.length > 0 && (
+        {showInvestments ? (
+          investments.list?.length > 0 && (
+            <CardAction>
               <Button variant="outline" size="sm" onClick={() => onEditInvestment(null)}>
                 <Plus />
                 Añadir
               </Button>
-            )
-          ) : (
-            <ToggleGroup
-              type="single"
-              size="sm"
-              variant="outline"
-              value={filterValue}
-              onValueChange={(next) => next && setFilterValue(next)}
-              aria-label="Filtrar el historial"
-            >
-              {FILTERS.map((f) => (
-                <ToggleGroupItem key={f.value} value={f.value} className="px-3 text-xs">
-                  {f.label}
-                </ToggleGroupItem>
-              ))}
-            </ToggleGroup>
-          )}
-        </CardAction>
+            </CardAction>
+          )
+        ) : isDesktop ? (
+          <CardAction>{filterControl}</CardAction>
+        ) : (
+          // En móvil no cabe junto a las pestañas: va debajo, a todo el ancho.
+          <div className="mt-1.5">{filterControl}</div>
+        )}
       </CardHeader>
       <CardContent className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 md:overflow-visible md:px-6">
         {showInvestments ? (
