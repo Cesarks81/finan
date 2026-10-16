@@ -5,6 +5,7 @@ import { FlowButtons } from '@/components/FlowButtons'
 import { FlowDialog } from '@/components/FlowDialog'
 import { GoalCard } from '@/components/GoalCard'
 import { HistoryTable } from '@/components/HistoryTable'
+import { InvestmentDialog } from '@/components/InvestmentDialog'
 import { ReviewDialog, ReviewReminder } from '@/components/MonthlyReview'
 import { NetWorthChart } from '@/components/NetWorthChart'
 import { SettingsDialog } from '@/components/SettingsDialog'
@@ -50,6 +51,8 @@ export function Dashboard() {
   // Ajustes: `page` abre directamente una de sus pantallas (p. ej. el objetivo).
   const [settings, setSettings] = useState({ open: false, page: null, key: 0 })
   const openSettings = (page = null) => setSettings((current) => ({ open: true, page, key: current.key + 1 }))
+  const [investment, setInvestment] = useState({ open: false, row: null, key: 0 })
+  const openInvestment = (row) => setInvestment((current) => ({ open: true, row, key: current.key + 1 }))
   const [review, setReview] = useState({ open: false, key: 0 })
   const monthlyReview = useMonthlyReview()
   const openReview = () => setReview((current) => ({ open: true, key: current.key + 1 }))
@@ -111,6 +114,7 @@ export function Dashboard() {
           />
           <HistoryTable
             onEdit={openEdit}
+            onEditInvestment={openInvestment}
             className={cn(
               'bg-background absolute inset-0 md:static md:col-start-1 md:row-start-2 md:flex',
               !showHistory && 'hidden',
@@ -133,6 +137,12 @@ export function Dashboard() {
         flow={dialog.flow}
         defaultType={dialog.type}
         formKey={dialog.key}
+      />
+      <InvestmentDialog
+        open={investment.open}
+        onOpenChange={(open) => setInvestment((current) => ({ ...current, open }))}
+        investment={investment.row}
+        formKey={investment.key}
       />
       <SettingsDialog
         open={settings.open}

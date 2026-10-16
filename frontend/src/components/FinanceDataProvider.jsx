@@ -4,7 +4,7 @@ import { api } from '@/api/client'
 import { FinanceDataContext, useApiQuery } from '@/hooks/useFinanceData'
 import { usePersistentState } from '@/hooks/usePersistentState'
 import { inRealTerms } from '@/lib/inflation'
-import { investmentOf, investmentValue, monthlySurplus, withInvestment } from '@/lib/investment'
+import { investmentOf, monthlySurplus, portfolio, withInvestments } from '@/lib/investment'
 import { fetchAllProjections } from '@/lib/projections'
 
 /**
@@ -31,32 +31,35 @@ export function FinanceDataProvider({ children }) {
   const flows = useApiQuery(api.listFlows, [version])
   const settings = useApiQuery(api.getSettings, [version])
   const reviews = useApiQuery(api.listReviews, [version])
-  // Lo que sobra cada mes según los flujos (el tope de cada aportación a la inversión), para
-  // cualquier mes desde que se guardó la inversión.
+  const investmentRows = useApiQuery(api.listInvestments, [version])
+  // Lo que sobra cada mes según los flujos (el tope de las aportaciones a las inversiones), para
+  // cualquier mes desde que se guardó cada inversión.
   const surplus = useMemo(() => (flows.data ? monthlySurplus(flows.data) : null), [flows.data])
-  // Sobre lo que da la API: la rentabilidad de la inversión (de los ajustes) y, con «Euros de
-  // hoy», la inflación. Hasta tener los ajustes (y, con inversión, los flujos) no se da ninguna
-  // proyección, para no dibujar primero la línea sin la inversión.
+  // Inversiones en números (`investmentOf`) y la cartera (`portfolio`: lo que vale cada una y lo
+  // que rinden), con lo que sobra cada mes repartido entre sus aportaciones.
+  const investments = useMemo(
+    () => ({ ...investmentRows, list: investmentRows.data?.map(investmentOf) ?? null }),
+    [investmentRows],
+  )
+  const wallet = useMemo(
+    () => (investments.list && surplus ? portfolio(investments.list, surplus) : null),
+    [investments.list, surplus],
+  )
+  // Sobre lo que da la API: la rentabilidad de las inversiones y, con «Euros de hoy», la
+  // inflación. Hasta tener los ajustes y las inversiones (y, si hay alguna, los flujos) no se da
+  // ninguna proyección, para no dibujar primero la línea sin la rentabilidad.
   const projections = useMemo(() => {
     if (!nominal.data) return nominal
-    if (!settings.data) return settings.error ? nominal : { ...nominal, data: null, loading: true }
-    const investment = investmentOf(settings.data)
-    if (investment && !surplus && !flows.error) return { ...nominal, data: null, loading: true }
+    const waiting = { ...nominal, data: null, loading: true }
+    if (!settings.data) return settings.error ? nominal : waiting
+    const list = investments.list ?? []
+    if (!investments.list && !investments.error) return waiting
+    if (list.length && !surplus && !flows.error) return waiting
     let data = nominal.data
-    if (investment && surplus) data = withInvestment(data, investment, settings.data.balance_date, surplus)
+    if (list.length && surplus) data = withInvestments(data, list, settings.data.balance_date, surplus)
     if (realTerms) data = inRealTerms(data, inflation / 100)
     return { ...nominal, data }
-  }, [nominal, settings.data, settings.error, surplus, flows.error, realTerms, inflation])
-  // Lo que vale la inversión en una fecha (con lo aportado y rendido desde que se guardó), para
-  // que Ajustes muestre su valor de hoy. Null sin inversión o sin flujos.
-  const investmentValueAt = useCallback(
-    (iso) => {
-      const investment = investmentOf(settings.data)
-      if (!investment || !surplus) return null
-      return investmentValue(investment, iso, surplus)
-    },
-    [settings.data, surplus],
-  )
+  }, [nominal, settings.data, settings.error, investments, surplus, flows.error, realTerms, inflation])
 
   const value = useMemo(
     () => ({
@@ -66,7 +69,8 @@ export function FinanceDataProvider({ children }) {
       flows,
       settings,
       reviews,
-      investmentValueAt,
+      investments,
+      wallet,
       surplus,
       chart: { splitLines, setSplitLines, calendar, setCalendar, realTerms, setRealTerms, inflation, setInflation },
     }),
@@ -77,7 +81,8 @@ export function FinanceDataProvider({ children }) {
       flows,
       settings,
       reviews,
-      investmentValueAt,
+      investments,
+      wallet,
       surplus,
       splitLines,
       setSplitLines,

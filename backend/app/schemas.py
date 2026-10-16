@@ -69,17 +69,6 @@ class SettingsPatch(BaseModel):
     goal_amount: Annotated[Decimal, Field(gt=0, max_digits=14, decimal_places=2)] | None = Field(
         default=None, description="Patrimonio que se quiere alcanzar"
     )
-    invest_amount: Annotated[Decimal, Field(ge=0, max_digits=14, decimal_places=2)] | None = Field(
-        default=None, description="Lo que hay invertido en invest_date"
-    )
-    invest_monthly: Annotated[Decimal, Field(ge=0, max_digits=12, decimal_places=2)] | None = Field(
-        default=None, description="Lo que se aporta a la inversión cada mes (sale de lo ahorrado)"
-    )
-    invest_return: Annotated[Decimal, Field(ge=-50, le=50, max_digits=5, decimal_places=2)] | None = Field(
-        default=None, description="Rentabilidad anual esperada, en %"
-    )
-    invest_date: date | None = Field(default=None, description="Fecha de invest_amount")
-    invest_until: date | None = Field(default=None, description="Último mes con aportación (sin ella, sin fin)")
     review_skipped: Annotated[str, Field(pattern=r"^\d{4}-(0[1-9]|1[0-2])$")] | None = Field(
         default=None, description="Mes (YYYY-MM) en que se pospuso la revisión mensual"
     )
@@ -92,12 +81,34 @@ class SettingsRead(BaseModel):
     balance_date: date | None
     goal_name: str | None = None
     goal_amount: Decimal | None = None
-    invest_amount: Decimal | None = None
-    invest_monthly: Decimal | None = None
-    invest_return: Decimal | None = None
-    invest_date: date | None = None
-    invest_until: date | None = None
     review_skipped: str | None = None
+
+
+class InvestmentBase(BaseModel):
+    name: str = Field(min_length=1, max_length=60, description="Para reconocerla: «Fondo indexado»…")
+    amount: Annotated[Decimal, Field(ge=0, max_digits=14, decimal_places=2)] = Field(
+        description="Lo invertido en start_date"
+    )
+    monthly: Annotated[Decimal, Field(ge=0, max_digits=12, decimal_places=2)] = Field(
+        default=Decimal(0), description="Lo que se aporta cada mes (sale de lo que sobra)"
+    )
+    annual_return: Annotated[Decimal, Field(ge=-50, le=50, max_digits=5, decimal_places=2)] = Field(
+        description="Rentabilidad anual esperada, en %"
+    )
+    start_date: date = Field(default_factory=date.today, description="Fecha de amount. Por defecto, hoy")
+    until: date | None = Field(default=None, description="Último día con aportación (sin él, sin fin)")
+
+    @model_validator(mode="after")
+    def check_until(self) -> "InvestmentBase":
+        if self.until is not None and self.until < self.start_date:
+            raise ValueError("until no puede ser anterior a start_date")
+        return self
+
+
+class InvestmentRead(InvestmentBase):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
 
 
 class ReviewBase(BaseModel):
@@ -136,17 +147,39 @@ class BackupSettings(SettingsPatch):
 
 
 class Backup(BaseModel):
-    """Copia de seguridad completa: los ajustes guardados, todos los flujos y las revisiones.
+    """Copia de seguridad completa: los ajustes guardados, los flujos, las inversiones y las revisiones.
 
-    Las preferencias de cada dispositivo (modo oscuro, opciones de la gráfica) no van en ella.
+    Las preferencias de cada dispositivo (modo oscuro, opciones de la gráfica) no van en ella. Las
+    copias de la versión 1 guardaban una sola inversión en los ajustes (`invest_*`): al importarlas
+    se convierte en la lista de inversiones.
     """
 
     app: Literal["finan"] = "finan"
-    version: Literal[1] = 1
+    version: Literal[1, 2] = 2
     exported_on: date | None = Field(default=None, description="Día en que se hizo la copia")
     settings: BackupSettings
     flows: list[FlowCreate] = Field(max_length=10_000)
+    investments: list[InvestmentBase] = Field(default=[], max_length=1_000)
     reviews: list[ReviewBase] = Field(default=[], max_length=10_000)
+
+    @model_validator(mode="before")
+    @classmethod
+    def legacy_investment(cls, data: object) -> object:
+        if not isinstance(data, dict) or "investments" in data or not isinstance(data.get("settings"), dict):
+            return data
+        settings = data["settings"]
+        complete = settings.get("invest_amount") is not None and settings.get("invest_return") is not None
+        if settings.get("invest_date") and complete:
+            legacy = {
+                "name": "Inversión",
+                "amount": settings["invest_amount"],
+                "monthly": settings.get("invest_monthly") or 0,
+                "annual_return": settings["invest_return"],
+                "start_date": settings["invest_date"],
+                "until": settings.get("invest_until"),
+            }
+            return {**data, "investments": [legacy]}
+        return data
 
     @model_validator(mode="after")
     def check_reviews(self) -> "Backup":
@@ -157,6 +190,7 @@ class Backup(BaseModel):
 
 class BackupResult(BaseModel):
     flows: int = Field(description="Número de flujos importados")
+    investments: int = Field(description="Número de inversiones importadas")
     reviews: int = Field(description="Número de revisiones importadas")
 
 

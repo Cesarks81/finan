@@ -79,15 +79,20 @@ def ensure_schema() -> None:
     """Crea las tablas y columnas que falten la primera vez que se usa la base de datos.
 
     Se hace en la primera petición, y no al arrancar, para que funcione igual en un servidor
-    normal y en las funciones serverless de Vercel.
+    normal y en las funciones serverless de Vercel. Después se pasan los datos que hayan cambiado
+    de sitio (`migrations.py`).
     """
     global _schema_ready
     if _schema_ready:
         return
     with _schema_lock:
         if not _schema_ready:
+            from . import migrations  # importa los modelos, que a su vez importan este módulo
+
             Base.metadata.create_all(bind=engine)
             add_missing_columns()
+            with SessionLocal() as db:
+                migrations.run(db)
             _schema_ready = True
 
 
