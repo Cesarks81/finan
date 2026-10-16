@@ -150,10 +150,26 @@ class BackupSettings(SettingsPatch):
     balance_date: date | None = None
 
 
+class BackupChart(BaseModel):
+    """Opciones de la gráfica del dispositivo que hizo la copia (las mismas reglas que en Ajustes).
+
+    Estricto (true/false de verdad, la inflación como número) porque el navegador las aplica tal cual.
+    """
+
+    model_config = ConfigDict(strict=True)
+
+    split_lines: bool = Field(default=False, description="Ingresos y gastos por separado")
+    calendar: bool = Field(default=False, description="Vista de calendario")
+    real_terms: bool = Field(default=False, description="Euros de hoy: descontar la inflación")
+    inflation: float = Field(default=2, ge=0, le=20, description="Inflación anual que se descuenta, en %")
+
+
 class Backup(BaseModel):
     """Copia de seguridad completa: los ajustes guardados, los flujos, las inversiones y las revisiones.
 
-    Las preferencias de cada dispositivo (modo oscuro, opciones de la gráfica) no van en ella. Las
+    También las opciones de la gráfica (`chart`, como la inflación de «Euros de hoy»), que son de
+    cada dispositivo: la API no las guarda (`GET` da null), el navegador las añade al archivo y las
+    aplica al importarlo, una vez que la API ha aceptado la copia. El modo oscuro no va en ella. Las
     copias de la versión 1 guardaban una sola inversión en los ajustes (`invest_*`): al importarlas
     se convierte en la lista de inversiones.
     """
@@ -162,6 +178,7 @@ class Backup(BaseModel):
     version: Literal[1, 2] = 2
     exported_on: date | None = Field(default=None, description="Día en que se hizo la copia")
     settings: BackupSettings
+    chart: BackupChart | None = Field(default=None, description="Opciones de la gráfica (las pone el navegador)")
     flows: list[FlowCreate] = Field(max_length=10_000)
     investments: list[InvestmentBase] = Field(default=[], max_length=1_000)
     reviews: list[ReviewBase] = Field(default=[], max_length=10_000)
