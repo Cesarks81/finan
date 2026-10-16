@@ -111,33 +111,55 @@ function ChartSettings() {
   )
 }
 
+const names = new Intl.ListFormat('es', { type: 'conjunction' })
+
+/**
+ * Patrimonio inicial y su fecha. Las inversiones con capital (lo invertido > 0) salen de él, así
+ * que cambiarlo una vez fijado las elimina: el formulario lo avisa y pide confirmación, y la API
+ * las borra en el mismo paso (`remove_investments`). Las que solo reciben aportaciones se quedan.
+ */
 function InitialBalanceForm({ settings }) {
-  const { refresh } = useFinanceData()
+  const { refresh, investments } = useFinanceData()
   const [amount, setAmount] = useState(settings.balance_date ? settings.initial_balance : '')
   const [balanceDate, setBalanceDate] = useState(() => settings.balance_date ?? toISODate(new Date()))
   const [status, setStatus] = useState('idle') // idle | saving | saved
+  const [confirming, setConfirming] = useState(false)
+  const [removed, setRemoved] = useState(0)
   const [error, setError] = useState(null)
+
+  const value = String(amount).replace(',', '.')
+  const changed =
+    Boolean(settings.balance_date) &&
+    (Number(value) !== Number(settings.initial_balance) || balanceDate !== settings.balance_date)
+  const funded = (investments.data ?? []).filter((row) => Number(row.amount) > 0)
+  const removing = changed && funded.length > 0
+  const fundedNames = names.format(funded.map((row) => `«${row.name}»`))
 
   const edit = (setter) => (event) => {
     setter(event.target.value)
     setStatus('idle')
+    setConfirming(false)
   }
 
-  async function handleSubmit(event) {
-    event.preventDefault()
+  async function save() {
     setStatus('saving')
     setError(null)
     try {
-      await api.updateSettings({
-        initial_balance: String(amount).replace(',', '.'),
-        balance_date: balanceDate,
-      })
+      await api.updateSettings({ initial_balance: value, balance_date: balanceDate, remove_investments: removing })
       refresh()
+      setRemoved(removing ? funded.length : 0)
+      setConfirming(false)
       setStatus('saved')
     } catch (err) {
       setError(err.message)
       setStatus('idle')
     }
+  }
+
+  function handleSubmit(event) {
+    event.preventDefault()
+    if (removing) setConfirming(true)
+    else save()
   }
 
   return (
@@ -161,23 +183,49 @@ function InitialBalanceForm({ settings }) {
         </div>
       </div>
 
+      {removing && !confirming && (
+        <p className="text-expense -mt-1 text-xs leading-relaxed">
+          Si lo cambias, se eliminarán {funded.length === 1 ? 'tu inversión' : 'tus inversiones'} con capital (
+          {fundedNames}), porque sale{funded.length === 1 ? '' : 'n'} de este patrimonio.
+        </p>
+      )}
+
       {error && (
         <p role="alert" className="text-destructive text-sm">
           {error}
         </p>
       )}
 
-      <div className="flex items-center justify-end gap-3">
-        {status === 'saved' && (
-          <p role="status" className="text-income flex items-center gap-1 text-sm">
-            <Check className="size-4" /> Guardado
+      {confirming ? (
+        <div className="border-destructive/40 grid gap-3 rounded-lg border p-3">
+          <p className="text-sm">
+            ¿Cambiar el patrimonio inicial y eliminar {fundedNames}? Lo invertido sale de este patrimonio. Las inversiones
+            que solo reciben aportaciones mensuales se mantienen. No se puede deshacer.
           </p>
-        )}
-        <Button type="submit" disabled={status === 'saving'}>
-          {status === 'saving' && <LoaderCircle className="animate-spin" />}
-          Guardar
-        </Button>
-      </div>
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <Button type="button" variant="outline" onClick={() => setConfirming(false)} disabled={status === 'saving'}>
+              No, cancelar
+            </Button>
+            <Button type="button" variant="destructive" onClick={save} disabled={status === 'saving'}>
+              {status === 'saving' && <LoaderCircle className="animate-spin" />}
+              Sí, cambiar y eliminar
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <div className="flex items-center justify-end gap-3">
+          {status === 'saved' && (
+            <p role="status" className="text-income flex items-center gap-1 text-sm">
+              <Check className="size-4" /> Guardado
+              {removed > 0 && ` · ${removed} ${removed === 1 ? 'inversión eliminada' : 'inversiones eliminadas'}`}
+            </p>
+          )}
+          <Button type="submit" disabled={status === 'saving'}>
+            {status === 'saving' && <LoaderCircle className="animate-spin" />}
+            Guardar
+          </Button>
+        </div>
+      )}
     </form>
   )
 }
@@ -578,7 +626,7 @@ const PAGES = {
   balance: {
     title: 'Patrimonio inicial',
     description:
-      'Tu patrimonio neto (ahorros menos deudas) en una fecha, normalmente hoy. La gráfica parte de ese valor: suma o resta los flujos desde esa fecha y reconstruye hacia atrás los anteriores. Puede ser negativo.',
+      'Tu patrimonio neto (ahorros menos deudas) en una fecha, normalmente hoy. La gráfica parte de ese valor: suma o resta los flujos desde esa fecha y reconstruye hacia atrás los anteriores. Puede ser negativo. Lo invertido sale de él: si lo cambias, se eliminan tus inversiones con capital. Para ajustarlo a tu saldo real sin tocarlas, usa la revisión mensual.',
     Content: InitialBalanceSetting,
   },
   goal: {
