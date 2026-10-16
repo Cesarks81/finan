@@ -47,8 +47,11 @@ Todo está fusionado en `main` y no hay trabajo a medias. Últimos PR:
 | #53 | Campos de fecha en iOS sin aspecto nativo; filas de dos campos alineadas por abajo |
 | #54 | Este traspaso |
 | #55 | Copia de seguridad: exportar e importar en Ajustes → Datos |
+| #56 | «Así te afecta» recalcula la inversión y avisa de lo que se deja de invertir; «Este mes no» en el servidor; lo que sobra cada mes, de los flujos |
 
 El usuario confirmó que #53 se ve bien en su iPhone. Falta que confirme en el iPhone que «Guardar copia» abre la hoja de compartir (o descarga) y que «Elegir archivo…» deja escoger el `.json` desde Archivos.
+
+En #56 el usuario pidió (con sus palabras): que si va a pagar algo que le hará invertir menos, finan le avise y diga cuánto deja de invertir desde ese gasto; que «Este mes no» valga en todos sus dispositivos; y que la inversión **nunca dé nada por hecho** en meses sin datos (no le gusta que suponga aportaciones).
 
 ## Cómo probar en este entorno
 
@@ -94,7 +97,7 @@ Los scripts de prueba de sesiones anteriores vivían en el scratchpad y **no se 
 ## Particularidades técnicas a recordar
 
 - **Migraciones:** no se usa Alembic, aunque `CLAUDE.md` lo menciona en el stack. Las columnas nuevas de un modelo se añaden solas con `add_missing_columns()` (en `database.py`), siempre que admitan NULL. Una columna quitada del modelo se queda en la base sin usarse; así está `settings.savings_target`.
-- **Capas de la proyección** en `FinanceDataProvider`: API → `withInvestment` (rentabilidad) → `inRealTerms` (inflación, si está activada). Hasta tener los ajustes no se entrega ninguna proyección, para no dibujar primero la línea sin la inversión.
+- **Capas de la proyección** en `FinanceDataProvider`: API → `withInvestment` (rentabilidad, con lo que sobra cada mes sacado de la lista de flujos: `monthlySurplus`) → `inRealTerms` (inflación, si está activada). Hasta tener los ajustes no se entrega ninguna proyección, para no dibujar primero la línea sin la inversión.
 - **Fechas:** todo se maneja como texto `YYYY-MM-DD`. `parseISODate` crea fechas locales, sin zona horaria.
 - **El linter (oxlint)** avisa de `new Date()` durante el render (`react(purity)`). Hay que calcularlo en un inicializador de `useState(() => …)` o en un callback.
 - **Animación de la gráfica:** cualquier cambio en los puntos la repite. Hay que evitar cambios de datos en cascada al cargar.
@@ -108,14 +111,12 @@ Los scripts de prueba de sesiones anteriores vivían en el scratchpad y **no se 
 
 ## Limitaciones conocidas y cosas sin probar
 
-- **«Así te afecta»:** no recalcula el tope de las aportaciones de la inversión con el flujo nuevo. Puede desviarse unos euros. Está documentado en `CLAUDE.md`.
-- **Revisión mensual:** el aviso de «Este mes no» se guarda por dispositivo (`localStorage`), no en el servidor.
-- **Meses sin datos en el plan de inversión:** un mes anterior a la vista M o posterior a los 40 años de la proyección larga usa la aportación mensual sin tope. En la práctica solo pasa si la inversión se guardó hace más de 6 meses.
+- **«Con 100 €/mes más»** (tarjeta del objetivo): suma 100 €/mes al patrimonio, pero no recalcula si esos 100 € completarían una aportación recortada a la inversión. Solo cambia algo si algún mes sobra menos que la aportación. No se ha pedido.
 
 ## Ideas que quedaron sobre la mesa
 
 Se propusieron y el usuario no las ha pedido todavía:
-- **Historial de revisiones mensuales:** guardar cada «previsto frente a real» para ver si las fugas bajan. Se le explicó en la sesión de #55; pendiente de que diga si lo quiere.
+- **Historial de revisiones mensuales:** guardar cada «previsto frente a real» para ver si las fugas bajan. Se le explicó en #55 y con más detalle en #56 (con un ejemplo de tres meses); pendiente de que diga si lo quiere.
 
 Descartadas por el usuario (no volver a proponerlas):
 - **Inversión como dos tramos** (líquido + invertido) en la gráfica. Prefiere ver solo el patrimonio total.

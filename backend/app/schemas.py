@@ -80,6 +80,9 @@ class SettingsPatch(BaseModel):
     )
     invest_date: date | None = Field(default=None, description="Fecha de invest_amount")
     invest_until: date | None = Field(default=None, description="Último mes con aportación (sin ella, sin fin)")
+    review_skipped: Annotated[str, Field(pattern=r"^\d{4}-(0[1-9]|1[0-2])$")] | None = Field(
+        default=None, description="Mes (YYYY-MM) en que se pospuso la revisión mensual"
+    )
 
 
 class SettingsRead(BaseModel):
@@ -94,6 +97,7 @@ class SettingsRead(BaseModel):
     invest_return: Decimal | None = None
     invest_date: date | None = None
     invest_until: date | None = None
+    review_skipped: str | None = None
 
 
 class BackupSettings(SettingsPatch):

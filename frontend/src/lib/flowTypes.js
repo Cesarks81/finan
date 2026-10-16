@@ -56,6 +56,18 @@ export function lastPayment(flow) {
   return ends.sort()[0] ?? null
 }
 
+/** Fechas de los pagos o cobros de un flujo hasta `until` (inclusive), con las reglas del backend. */
+export function flowDates(flow, until) {
+  if (!isRecurringFlow(flow)) return flow.start_date <= until ? [flow.start_date] : []
+  const last = lastPayment(flow)
+  const dates = []
+  for (let index = 0; ; index++) {
+    const when = monthlyPayment(flow.start_date, index)
+    if (when > until || (last && when > last)) return dates
+    dates.push(when)
+  }
+}
+
 /** Pagos mensuales que quedan desde hoy (incluido) hasta el último. */
 function remainingPayments(flow, last, today) {
   let count = 0
