@@ -88,4 +88,8 @@ export const api = {
   updateSettings: (settings) => request('/settings', { method: 'PUT', body: settings }),
   /** Cambia solo los ajustes enviados (p. ej. `{ goal_amount }`). */
   patchSettings: (changes) => request('/settings', { method: 'PATCH', body: changes }),
+  /** Copia de seguridad: ajustes y todos los flujos. */
+  exportBackup: () => request('/backup'),
+  /** Sustituye todos los datos por los de la copia; devuelve `{ flows }` (los importados). */
+  importBackup: (backup) => request('/backup', { method: 'PUT', body: backup }),
 }

@@ -45,8 +45,10 @@ Todo está fusionado en `main` y no hay trabajo a medias. Últimos PR:
 | #51 | Inversión: nunca aportar más de lo que sobra cada mes |
 | #52 | Inversión: máximo a aportar, fecha final y plan mes a mes |
 | #53 | Campos de fecha en iOS sin aspecto nativo; filas de dos campos alineadas por abajo |
+| #54 | Este traspaso |
+| #55 | Copia de seguridad: exportar e importar en Ajustes → Datos |
 
-El usuario confirmó que #53 se ve bien en su iPhone.
+El usuario confirmó que #53 se ve bien en su iPhone. Falta que confirme en el iPhone que «Guardar copia» abre la hoja de compartir (o descarga) y que «Elegir archivo…» deja escoger el `.json` desde Archivos.
 
 ## Cómo probar en este entorno
 
@@ -74,7 +76,9 @@ Los scripts de prueba de sesiones anteriores vivían en el scratchpad y **no se 
   - Conéctate con `DATABASE_URL=postgresql://postgres@127.0.0.1:5433/<base>`.
   - Crea las bases con `ENCODING 'UTF8' TEMPLATE template0`; con SQL_ASCII, psycopg falla.
   - Si el clúster no existe en el contenedor nuevo, hay que crearlo con `initdb`.
-- **Probar la API sin servidor:** `from api.index import app` con `fastapi.testclient.TestClient`, ejecutado con `PYTHONPATH=<raíz del repo>`.
+- **Probar la API sin servidor:** `from api.index import app` con `fastapi.testclient.TestClient`, ejecutado con `PYTHONPATH=<raíz del repo>`. El `TestClient` necesita `pip install httpx2` en el venv (no está en `requirements.txt`).
+- **Con contraseña:** arranca el backend con `APP_PASSWORD=<clave>`; la pantalla de acceso se rellena con `getByLabel(/contraseña/i)` y el botón «Entrar».
+- **Ojo con `pkill -f`:** si el patrón aparece en el propio comando de Bash, mata también esa shell. Mejor buscar el PID con `ps` y usar `kill`.
 - **Datos de prueba habituales:**
   - IFM nómina 1800 € desde 2026-01-01;
   - GFM alquiler 750 € y súper 300 €;
@@ -106,12 +110,12 @@ Los scripts de prueba de sesiones anteriores vivían en el scratchpad y **no se 
 
 - **«Así te afecta»:** no recalcula el tope de las aportaciones de la inversión con el flujo nuevo. Puede desviarse unos euros. Está documentado en `CLAUDE.md`.
 - **Revisión mensual:** el aviso de «Este mes no» se guarda por dispositivo (`localStorage`), no en el servidor.
-- **«Cerrar sesión en este dispositivo»:** la fila del menú de Ajustes no se ha probado con `APP_PASSWORD` configurada.
 - **Meses sin datos en el plan de inversión:** un mes anterior a la vista M o posterior a los 40 años de la proyección larga usa la aportación mensual sin tope. En la práctica solo pasa si la inversión se guardó hace más de 6 meses.
 
 ## Ideas que quedaron sobre la mesa
 
 Se propusieron y el usuario no las ha pedido todavía:
-- **Historial de revisiones mensuales:** guardar cada «previsto frente a real» para ver si las fugas bajan.
-- **Exportar e importar los flujos:** una copia de seguridad en archivo.
-- **Inversión como dos tramos** (líquido + invertido) en la gráfica. El usuario eligió ver solo el patrimonio total.
+- **Historial de revisiones mensuales:** guardar cada «previsto frente a real» para ver si las fugas bajan. Se le explicó en la sesión de #55; pendiente de que diga si lo quiere.
+
+Descartadas por el usuario (no volver a proponerlas):
+- **Inversión como dos tramos** (líquido + invertido) en la gráfica. Prefiere ver solo el patrimonio total.
