@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { CalendarCheck, ChevronRight, LoaderCircle } from 'lucide-react'
+import { CalendarCheck, ChevronRight, LoaderCircle, Trash2 } from 'lucide-react'
 
 import { api } from '@/api/client'
 import { Button } from '@/components/ui/button'
@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useFinanceData } from '@/hooks/useFinanceData'
 import { formatDate, formatEUR, formatEURWhole, toISODate } from '@/lib/format'
-import { anchorForToday, reviewDiff } from '@/lib/review'
+import { anchorForToday, reviewDiff, reviewMonth, savedReviewDiff } from '@/lib/review'
 import { cn } from '@/lib/utils'
 
 const monthName = new Intl.DateTimeFormat('es-ES', { month: 'long' })
@@ -72,8 +72,74 @@ function diffHint({ diff, perDay }, previous) {
   return 'Tienes menos de lo previsto: algún gasto sin apuntar.'
 }
 
+/** Diferencia con signo y color: «+30 €» en verde, «−240 €» en rojo, «0 €» tenue. */
+export function ReviewDiffText({ diff, className }) {
+  const even = Math.abs(diff) < 1
+  return (
+    <span className={cn(even ? 'text-muted-foreground' : diff < 0 ? 'text-expense' : 'text-income', className)}>
+      {!even && (diff > 0 ? '+' : '−')}
+      {formatEURWhole(even ? 0 : Math.abs(diff))}
+    </span>
+  )
+}
+
+/**
+ * Historial de revisiones: por cada una, lo previsto, lo real y la diferencia, con lo que se
+ * escapó al día desde el ajuste anterior si faltaba dinero. Así se ve si la fuga baja mes a mes.
+ * Con `onDelete`, cada fila tiene un botón para borrarla.
+ */
+export function ReviewHistory({ reviews, onDelete }) {
+  return (
+    <table className="w-full text-xs tabular-nums">
+      <thead className="text-muted-foreground">
+        <tr>
+          <th className="py-1 text-left font-normal">Mes</th>
+          <th className="py-1 text-right font-normal">Previsto</th>
+          <th className="py-1 text-right font-normal">Real</th>
+          <th className="py-1 text-right font-normal">Diferencia</th>
+          {onDelete && (
+            <th className="w-7 py-1">
+              <span className="sr-only">Borrar</span>
+            </th>
+          )}
+        </tr>
+      </thead>
+      <tbody>
+        {reviews.map((review) => {
+          const { diff, perDay } = savedReviewDiff(review)
+          return (
+            <tr key={review.id} className="border-t align-top">
+              <td className="py-1.5">{reviewMonth(review)}</td>
+              <td className="text-muted-foreground py-1.5 text-right">{formatEURWhole(review.forecast)}</td>
+              <td className="py-1.5 text-right">{formatEURWhole(review.actual)}</td>
+              <td className="py-1.5 text-right">
+                <ReviewDiffText diff={diff} className="font-medium" />
+                {perDay && <span className="text-muted-foreground block text-[11px]">{formatEURWhole(perDay)}/día</span>}
+              </td>
+              {onDelete && (
+                <td className="py-0.5 text-right">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => onDelete(review)}
+                    aria-label={`Borrar la revisión de ${reviewMonth(review)}`}
+                    className="text-muted-foreground size-7"
+                  >
+                    <Trash2 className="size-3.5" />
+                  </Button>
+                </td>
+              )}
+            </tr>
+          )
+        })}
+      </tbody>
+    </table>
+  )
+}
+
 function ReviewForm({ onDone, onSkip }) {
-  const { projections, settings, refresh } = useFinanceData()
+  const { projections, settings, reviews, refresh } = useFinanceData()
   const [real, setReal] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
@@ -86,6 +152,7 @@ function ReviewForm({ onDone, onSkip }) {
   const valid = real !== '' && Number.isFinite(value)
   const previous = settings.data?.balance_date && settings.data.balance_date < today ? settings.data.balance_date : null
   const result = valid ? reviewDiff(value, forecast, previous) : null
+  const earlier = (reviews.data ?? []).filter((review) => review.review_date < today).slice(0, 3)
 
   async function handleSubmit(event) {
     event.preventDefault()
@@ -93,8 +160,14 @@ function ReviewForm({ onDone, onSkip }) {
     setSaving(true)
     setError(null)
     try {
-      // Ancla el patrimonio hoy: desde aquí la proyección parte del saldo real.
-      await api.updateSettings({ initial_balance: anchorForToday(value, todayPoint).toFixed(2), balance_date: today })
+      // Guarda la revisión en el historial y ancla el patrimonio hoy: desde aquí la proyección
+      // parte del saldo real.
+      await api.createReview({
+        review_date: today,
+        forecast: forecast.toFixed(2),
+        actual: value.toFixed(2),
+        anchor: anchorForToday(value, todayPoint).toFixed(2),
+      })
       refresh()
       onDone()
     } catch (err) {
@@ -160,6 +233,15 @@ function ReviewForm({ onDone, onSkip }) {
       <p className="text-muted-foreground m-0 text-center text-xs leading-relaxed">
         La gráfica partirá de este saldo; tus flujos no cambian.
       </p>
+
+      {earlier.length > 0 && (
+        <section aria-label="Revisiones anteriores" className="grid gap-1.5 border-t pt-4">
+          <h3 className="text-muted-foreground m-0 text-xs font-semibold tracking-wide uppercase">
+            Revisiones anteriores
+          </h3>
+          <ReviewHistory reviews={earlier} />
+        </section>
+      )}
     </form>
   )
 }

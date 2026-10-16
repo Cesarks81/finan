@@ -12,7 +12,7 @@ import { fetchAllProjections } from '@/lib/projections'
  * al entrar y quedan en memoria, así que cambiar de vista es instantáneo. Solo se vuelven a
  * pedir cuando cambian los datos (`refresh`), y mientras llegan se siguen mostrando las anteriores.
  * La lista de flujos se carga igual y la comparten el Historial y los botones de flujo, y
- * también el patrimonio inicial, para que Ajustes se abra sin esperas.
+ * también los ajustes y el historial de revisiones, para que Ajustes se abra sin esperas.
  *
  * También guarda las preferencias de la gráfica (por dispositivo): `splitLines` (ingresos y
  * gastos por separado), `calendar` (vista de calendario, que cambia las ventanas pedidas) y
@@ -30,6 +30,7 @@ export function FinanceDataProvider({ children }) {
   const nominal = useApiQuery(() => fetchAllProjections({ calendar }), [version, calendar])
   const flows = useApiQuery(api.listFlows, [version])
   const settings = useApiQuery(api.getSettings, [version])
+  const reviews = useApiQuery(api.listReviews, [version])
   // Lo que sobra cada mes según los flujos (el tope de cada aportación a la inversión), para
   // cualquier mes desde que se guardó la inversión.
   const surplus = useMemo(() => (flows.data ? monthlySurplus(flows.data) : null), [flows.data])
@@ -64,6 +65,7 @@ export function FinanceDataProvider({ children }) {
       projections,
       flows,
       settings,
+      reviews,
       investmentValueAt,
       surplus,
       chart: { splitLines, setSplitLines, calendar, setCalendar, realTerms, setRealTerms, inflation, setInflation },
@@ -74,6 +76,7 @@ export function FinanceDataProvider({ children }) {
       projections,
       flows,
       settings,
+      reviews,
       investmentValueAt,
       surplus,
       splitLines,
