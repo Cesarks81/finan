@@ -1,4 +1,4 @@
-import { isRecurringFlow, lastPayment, monthlyPayment, FLOW_TYPES } from '@/lib/flowTypes'
+import { flowDates, FLOW_TYPES } from '@/lib/flowTypes'
 
 /**
  * Objetivo de patrimonio. Todo sale de la proyección mensual larga (`long` en
@@ -37,18 +37,7 @@ export function monthsBetween(a, b) {
 function flowContribution(flow, points, anchor) {
   const sign = FLOW_TYPES[flow.flow_type].income ? 1 : -1
   const amount = cents(flow.amount) * sign
-  const horizon = points.at(-1).period_end
-  const dates = []
-  if (!isRecurringFlow(flow)) {
-    dates.push(flow.start_date)
-  } else {
-    const last = lastPayment(flow)
-    for (let i = 0; ; i++) {
-      const when = monthlyPayment(flow.start_date, i)
-      if (when > horizon || (last && when > last)) break
-      dates.push(when)
-    }
-  }
+  const dates = flowDates(flow, points.at(-1).period_end)
   return points.map((p) => {
     if (anchor && p.period_end < anchor) {
       return -amount * dates.filter((d) => d > p.period_end && d < anchor).length
@@ -79,13 +68,18 @@ export function goalForecast(longPoints, goalAmount, todayBalance, extra = 100) 
 
 /**
  * Cómo cambia la fecha del objetivo si se añade `candidate` (y, al editar, se quita `previous`).
- * `anchor` es la fecha del patrimonio inicial (`balance_date`, o null). Devuelve
- * `{ before, after, delta }` (meses; null si alguna fecha no se alcanza).
+ * `anchor` es la fecha del patrimonio inicial (`balance_date`, o null). `investmentShift` (fecha →
+ * €), si hay inversión, es lo que cambia su rentabilidad porque el flujo cambia lo que se aporta
+ * (`investmentImpact` en `lib/investment.js`). Devuelve `{ before, after, delta }` (meses; null si
+ * alguna fecha no se alcanza).
  */
-export function goalImpact(longPoints, goalAmount, candidate, previous = null, anchor = null) {
+export function goalImpact(longPoints, goalAmount, candidate, previous = null, anchor = null, investmentShift = null) {
   const add = flowContribution(candidate, longPoints, anchor)
   const remove = previous ? flowContribution(previous, longPoints, anchor) : null
-  const adjust = add.map((value, i) => value - (remove ? remove[i] : 0))
+  const adjust = add.map(
+    (value, i) =>
+      value - (remove ? remove[i] : 0) + (investmentShift ? cents(investmentShift(longPoints[i].period_end)) : 0),
+  )
   const before = firstMonthReaching(longPoints, goalAmount)
   const after = firstMonthReaching(longPoints, goalAmount, adjust)
   return { before, after, delta: before && after ? monthsBetween(before, after) : null }

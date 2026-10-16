@@ -30,20 +30,24 @@ export function FinanceDataProvider({ children }) {
   const nominal = useApiQuery(() => fetchAllProjections({ calendar }), [version, calendar])
   const flows = useApiQuery(api.listFlows, [version])
   const settings = useApiQuery(api.getSettings, [version])
+  // Lo que sobra cada mes según los flujos (el tope de cada aportación a la inversión), para
+  // cualquier mes desde que se guardó la inversión.
+  const surplus = useMemo(() => (flows.data ? monthlySurplus(flows.data) : null), [flows.data])
   // Sobre lo que da la API: la rentabilidad de la inversión (de los ajustes) y, con «Euros de
-  // hoy», la inflación. Hasta tener los ajustes no se da ninguna proyección, para no dibujar
-  // primero la línea sin la inversión.
+  // hoy», la inflación. Hasta tener los ajustes (y, con inversión, los flujos) no se da ninguna
+  // proyección, para no dibujar primero la línea sin la inversión.
   const projections = useMemo(() => {
     if (!nominal.data) return nominal
     if (!settings.data) return settings.error ? nominal : { ...nominal, data: null, loading: true }
-    let data = withInvestment(nominal.data, investmentOf(settings.data), settings.data.balance_date)
+    const investment = investmentOf(settings.data)
+    if (investment && !surplus && !flows.error) return { ...nominal, data: null, loading: true }
+    let data = nominal.data
+    if (investment && surplus) data = withInvestment(data, investment, settings.data.balance_date, surplus)
     if (realTerms) data = inRealTerms(data, inflation / 100)
     return { ...nominal, data }
-  }, [nominal, settings.data, settings.error, realTerms, inflation])
+  }, [nominal, settings.data, settings.error, surplus, flows.error, realTerms, inflation])
   // Lo que vale la inversión en una fecha (con lo aportado y rendido desde que se guardó), para
-  // que Ajustes muestre su valor de hoy. Null sin inversión o sin proyecciones.
-  // Lo que sobra cada mes según la API (el tope de cada aportación), también para Ajustes.
-  const surplus = useMemo(() => (nominal.data ? monthlySurplus(nominal.data) : null), [nominal.data])
+  // que Ajustes muestre su valor de hoy. Null sin inversión o sin flujos.
   const investmentValueAt = useCallback(
     (iso) => {
       const investment = investmentOf(settings.data)

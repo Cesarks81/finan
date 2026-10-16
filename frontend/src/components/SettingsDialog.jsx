@@ -546,7 +546,7 @@ function ContributionPlan({ plan, monthly, until, onUseMax }) {
               <tr key={row.month} className="border-t">
                 <td className="py-1">{formatMonthYear(row.month)}</td>
                 <td className="text-muted-foreground py-1 text-right">
-                  {row.available === null ? '—' : formatEURWhole(row.available)}
+                  {formatEURWhole(row.available)}
                 </td>
                 <td className={cn('py-1 text-right', row.contribution < monthly && 'text-expense')}>
                   {formatEURWhole(row.contribution)}

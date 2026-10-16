@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { LoaderCircle, Trash2 } from 'lucide-react'
+import { LoaderCircle, Trash2, TrendingDown, TrendingUp } from 'lucide-react'
 
 import { api } from '@/api/client'
 import { Button } from '@/components/ui/button'
@@ -17,8 +17,9 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useFinanceData } from '@/hooks/useFinanceData'
 import { FIXED_TYPES, FLOW_ORDER, FLOW_TYPES, VARIABLE_TYPES, isRecurringFlow } from '@/lib/flowTypes'
-import { formatMonthYear, toISODate } from '@/lib/format'
+import { formatEURWhole, formatMonthYear, toISODate } from '@/lib/format'
 import { goalImpact } from '@/lib/goal'
+import { investmentImpact, investmentOf, surplusWith } from '@/lib/investment'
 import { cn } from '@/lib/utils'
 
 // Periodicidad de un flujo variable (GVM / IVM): puntual o temporal (durante N meses / hasta una fecha).
@@ -102,39 +103,87 @@ function ImpactRow({ label, before, after, tone }) {
   )
 }
 
+const euros = new Intl.NumberFormat('es-ES', { maximumFractionDigits: 0 })
+
 /**
- * «Así te afecta»: cómo cambia la fecha del objetivo con el flujo del formulario (al editar, en
- * lugar del original). Nada si no hay objetivo, si no cambia o si el formulario aún no está
- * completo.
+ * Cuánto cambia lo que se invierte, en una frase: «Desde nov 2026 inviertes 50 € menos al mes»,
+ * «En nov 2026 inviertes 350 € menos», «De nov 2026 a ene 2027 inviertes 50 € menos al mes
+ * (150 € en total)»…
+ */
+function contributionText(change) {
+  const word = change.total < 0 ? 'menos' : 'más'
+  const total = formatEURWhole(Math.abs(change.total))
+  const perMonth =
+    Math.round(change.min) === Math.round(change.max)
+      ? formatEURWhole(change.max)
+      : `entre ${euros.format(change.min)} y ${formatEURWhole(change.max)}`
+  const from = formatMonthYear(change.first)
+  if (change.mixed) return `En total inviertes ${total} ${word}.`
+  if (change.count === 1) return `En ${from} inviertes ${total} ${word}.`
+  if (change.open) return `Desde ${from} inviertes ${perMonth} ${word} al mes.`
+  const range = `De ${from} a ${formatMonthYear(change.last)}`
+  if (Math.round(change.min) === Math.round(change.max)) return `${range} inviertes ${perMonth} ${word} al mes (${total} en total).`
+  return `${range} inviertes ${total} ${word} en total.`
+}
+
+/**
+ * «Así te afecta»: cómo cambian, con el flujo del formulario (al editar, en lugar del original),
+ * la fecha del objetivo y, si hay inversión, lo que se invierte: cada mes se aporta como mucho lo
+ * que sobra, así que un gasto puede recortar las aportaciones (y lo que rinden) y un ingreso
+ * completarlas. Nada si no cambia ninguna de las dos o si el formulario aún no está completo.
  */
 function ImpactPreview({ form, flow }) {
-  const { settings, projections } = useFinanceData()
+  const { settings, projections, surplus } = useFinanceData()
   const candidate = toPayload(form)
   const complete =
     Number(candidate.amount) > 0 &&
     ISO_DATE.test(candidate.start_date) &&
     (form.variableMode !== 'months' || candidate.duration_months >= 1) &&
     (form.variableMode !== 'until' || ISO_DATE.test(candidate.end_date ?? ''))
-  const goal = settings.data?.goal_amount
   const long = projections.data?.long
-  const reached = Number(projections.data?.todayBalance) >= Number(goal)
-  if (!complete || !goal || !long || reached) return null
+  if (!complete || !long || !settings.data) return null
 
   const candidateFlow = { ...candidate, is_recurring: isRecurringFlow(candidate) }
-  const { before, after, delta } = goalImpact(long, goal, candidateFlow, flow, settings.data.balance_date)
-  if (before === after) return null
+  const balanceDate = settings.data.balance_date
+  const investment = surplus ? investmentOf(settings.data) : null
+  const invest = investment
+    ? investmentImpact(investment, balanceDate, surplus, surplusWith(surplus, candidateFlow, flow), long.at(-1).period)
+    : null
+  const change = invest?.change && Math.abs(invest.change.total) >= 1 ? invest.change : null
+
+  const goal = settings.data.goal_amount
+  const reached = Number(projections.data.todayBalance) >= Number(goal)
+  const goalChange = goal && !reached ? goalImpact(long, goal, candidateFlow, flow, balanceDate, invest?.shift) : null
+  const showGoal = goalChange && goalChange.before !== goalChange.after
+  if (!showGoal && !change) return null
   const text = (month) => (month ? formatMonthYear(month) : 'más de 40 años')
-  const later = delta === null ? !after : delta > 0
+  const later = goalChange && (goalChange.delta === null ? !goalChange.after : goalChange.delta > 0)
+  const ChangeIcon = change?.total < 0 ? TrendingDown : TrendingUp
 
   return (
     <section aria-label="Así te afecta" className="bg-muted/60 grid gap-2.5 rounded-lg px-3.5 py-3">
       <h3 className="text-muted-foreground m-0 text-xs font-semibold tracking-wide uppercase">Así te afecta</h3>
-      <ImpactRow
-        label={settings.data.goal_name || 'Objetivo'}
-        before={text(before)}
-        after={text(after)}
-        tone={later ? 'bad' : 'good'}
-      />
+      {showGoal && (
+        <ImpactRow
+          label={settings.data.goal_name || 'Objetivo'}
+          before={text(goalChange.before)}
+          after={text(goalChange.after)}
+          tone={later ? 'bad' : 'good'}
+        />
+      )}
+      {change && (
+        <p className={cn('m-0 flex gap-2 text-[13px] leading-snug', change.total < 0 ? 'text-expense' : 'text-income')}>
+          <ChangeIcon className="mt-px size-4 shrink-0" aria-hidden="true" />
+          <span>
+            {contributionText(change)}{' '}
+            <span className="text-muted-foreground">
+              {change.total < 0
+                ? `${change.count === 1 ? 'Ese mes' : 'Esos meses'} no te sobra para tu aportación de ${formatEURWhole(investment.monthly)}.`
+                : `Te sobra más para completar tu aportación de ${formatEURWhole(investment.monthly)}.`}
+            </span>
+          </span>
+        </p>
+      )}
     </section>
   )
 }
