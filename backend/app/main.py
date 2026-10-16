@@ -196,17 +196,63 @@ def patch_settings(payload: schemas.SettingsPatch, db: DbSession) -> models.Sett
     return settings
 
 
+# --- Revisiones mensuales -------------------------------------------------------
+
+
+@private.get("/reviews", response_model=list[schemas.ReviewRead], tags=["revisiones"])
+def list_reviews(db: DbSession) -> list[models.Review]:
+    """Historial de revisiones, de la más reciente a la más antigua."""
+    return list(db.scalars(select(models.Review).order_by(models.Review.review_date.desc())))
+
+
+@private.post("/reviews", response_model=schemas.ReviewRead, status_code=status.HTTP_201_CREATED, tags=["revisiones"])
+def create_review(payload: schemas.ReviewCreate, db: DbSession) -> models.Review:
+    """Guarda la revisión y ancla el patrimonio inicial ese día, de una vez.
+
+    Si ya había una revisión ese día, se sustituye (conservando el ajuste anterior a ella).
+    """
+    settings = db.merge(load_settings(db))
+    review = db.scalar(select(models.Review).where(models.Review.review_date == payload.review_date))
+    if review is None:
+        previous = settings.balance_date
+        review = models.Review(
+            review_date=payload.review_date,
+            previous_date=previous if previous is not None and previous < payload.review_date else None,
+        )
+        db.add(review)
+    review.forecast = payload.forecast
+    review.actual = payload.actual
+    settings.initial_balance = payload.anchor
+    settings.balance_date = payload.review_date
+    db.commit()
+    db.refresh(review)
+    return review
+
+
+@private.delete("/reviews/{review_id}", status_code=status.HTTP_204_NO_CONTENT, tags=["revisiones"])
+def delete_review(review_id: int, db: DbSession) -> Response:
+    """Borra una revisión del historial (el patrimonio inicial no cambia)."""
+    review = db.get(models.Review, review_id)
+    if review is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, f"Revisión {review_id} no encontrada")
+    db.delete(review)
+    db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
 # --- Copia de seguridad --------------------------------------------------------
 
 
 @private.get("/backup", response_model=schemas.Backup, tags=["copia de seguridad"])
 def export_backup(db: DbSession) -> schemas.Backup:
-    """Todos los datos (ajustes y flujos) para guardarlos en un archivo."""
+    """Todos los datos (ajustes, flujos y revisiones) para guardarlos en un archivo."""
     flows = db.scalars(select(models.Flow).order_by(models.Flow.id))
+    reviews = db.scalars(select(models.Review).order_by(models.Review.review_date))
     return schemas.Backup(
         exported_on=date.today(),
         settings=schemas.BackupSettings.model_validate(load_settings(db), from_attributes=True),
         flows=[schemas.FlowCreate.model_validate(flow, from_attributes=True) for flow in flows],
+        reviews=[schemas.ReviewBase.model_validate(review, from_attributes=True) for review in reviews],
     )
 
 
@@ -214,12 +260,14 @@ def export_backup(db: DbSession) -> schemas.Backup:
 def import_backup(payload: schemas.Backup, db: DbSession) -> schemas.BackupResult:
     """Sustituye todos los datos por los de la copia, de una vez: si algo falla, no cambia nada."""
     db.execute(delete(models.Flow))
+    db.execute(delete(models.Review))
     db.add_all(models.Flow(**flow.model_dump()) for flow in payload.flows)
+    db.add_all(models.Review(**review.model_dump()) for review in payload.reviews)
     settings = db.merge(load_settings(db))
     for field, value in payload.settings.model_dump().items():
         setattr(settings, field, value)
     db.commit()
-    return schemas.BackupResult(flows=len(payload.flows))
+    return schemas.BackupResult(flows=len(payload.flows), reviews=len(payload.reviews))
 
 
 # --- Proyección de patrimonio ------------------------------------------------

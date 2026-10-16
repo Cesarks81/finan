@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import {
+  CalendarCheck,
   ChartLine,
   Check,
   ChevronLeft,
@@ -17,6 +18,7 @@ import {
 } from 'lucide-react'
 
 import { api } from '@/api/client'
+import { ReviewDiffText, ReviewHistory } from '@/components/MonthlyReview'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -29,6 +31,7 @@ import { useTheme } from '@/hooks/useTheme'
 import { backupFile, readBackup, saveFile } from '@/lib/backup'
 import { formatDate, formatEURWhole, formatMonthYear, toISODate } from '@/lib/format'
 import { contributionPlan, investmentOf } from '@/lib/investment'
+import { reviewMonth, savedReviewDiff } from '@/lib/review'
 import { cn } from '@/lib/utils'
 
 function SwitchSetting({ id, label, description, checked, onCheckedChange }) {
@@ -382,8 +385,8 @@ function BackupSetting() {
             <p className="text-sm">
               Copia {pending.exported_on ? `del ${formatDate(pending.exported_on)} ` : ''}con{' '}
               {flowCount(pending.flows.length)}. Sustituirá todo lo que tienes ahora ({flowCount(flows.data?.length ?? 0)},
-              patrimonio inicial, objetivo e inversión). No se puede deshacer: si quieres conservarlo, guarda antes una
-              copia.
+              patrimonio inicial, objetivo, inversión y revisiones). No se puede deshacer: si quieres conservarlo, guarda
+              antes una copia.
             </p>
             <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
               <Button variant="outline" onClick={() => setPending(null)} disabled={status === 'importing'}>
@@ -712,6 +715,73 @@ function InvestmentSetting() {
   return <InvestmentForm settings={data} />
 }
 
+/** Historial de revisiones mensuales, con la opción de borrar una (tras confirmarlo). */
+function ReviewsSetting() {
+  const { reviews, refresh } = useFinanceData()
+  const [confirming, setConfirming] = useState(null) // revisión a borrar
+  const [deleting, setDeleting] = useState(false)
+  const [error, setError] = useState(null)
+
+  async function handleDelete() {
+    setDeleting(true)
+    setError(null)
+    try {
+      await api.deleteReview(confirming.id)
+      refresh()
+      setConfirming(null)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setDeleting(false)
+    }
+  }
+
+  if (reviews.error) return <p className="text-destructive text-sm">{reviews.error.message}</p>
+  if (!reviews.data) return <LoaderCircle className="text-muted-foreground mx-auto size-5 animate-spin" />
+  if (!reviews.data.length) {
+    return (
+      <p className="text-muted-foreground rounded-lg border p-3 text-sm">
+        Aún no has hecho ninguna. Cuando toque, finan te avisará en la pantalla principal.
+      </p>
+    )
+  }
+  return (
+    <div className="grid gap-3">
+      <div className="rounded-lg border px-3 py-2">
+        <ReviewHistory
+          reviews={reviews.data}
+          onDelete={(review) => {
+            setConfirming(review)
+            setError(null)
+          }}
+        />
+      </div>
+      {confirming && (
+        <div className="border-destructive/40 grid gap-3 rounded-lg border p-3">
+          <p className="text-sm">
+            ¿Borrar la revisión de {reviewMonth(confirming)}? Solo se quita del historial: tu patrimonio inicial no
+            cambia.
+          </p>
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <Button variant="outline" onClick={() => setConfirming(null)} disabled={deleting}>
+              No, cancelar
+            </Button>
+            <Button variant="destructive" onClick={handleDelete} disabled={deleting}>
+              {deleting && <LoaderCircle className="animate-spin" />}
+              Sí, borrar
+            </Button>
+          </div>
+        </div>
+      )}
+      {error && (
+        <p role="alert" className="text-destructive text-sm">
+          {error}
+        </p>
+      )}
+    </div>
+  )
+}
+
 const PAGES = {
   chart: {
     title: 'Gráfica',
@@ -736,10 +806,16 @@ const PAGES = {
       'Qué parte de tu patrimonio está en fondos, acciones o similares (ya cuenta dentro de tu patrimonio). Solo esa parte crece con la rentabilidad. Cada mes se aporta lo que indiques, hasta la fecha que elijas, pero nunca más de lo que te sobra ese mes: debajo ves el máximo y el mes a mes.',
     Content: InvestmentSetting,
   },
+  reviews: {
+    title: 'Revisiones',
+    description:
+      'Cada mes, la revisión compara el saldo real de tus cuentas con lo que preveía finan. Lo que falta suele ser gasto que no apuntaste (tu fuga), repartido por día desde la revisión anterior. Si baja mes a mes, vas bien.',
+    Content: ReviewsSetting,
+  },
   backup: {
     title: 'Copia de seguridad',
     description:
-      'Guarda en un archivo tus flujos, el patrimonio inicial, el objetivo y la inversión, y recupéralos cuando quieras, en este dispositivo o en otro. El modo oscuro y las opciones de la gráfica no van en la copia: son de cada dispositivo.',
+      'Guarda en un archivo tus flujos, el patrimonio inicial, el objetivo, la inversión y tus revisiones, y recupéralos cuando quieras, en este dispositivo o en otro. El modo oscuro y las opciones de la gráfica no van en la copia: son de cada dispositivo.',
     Content: BackupSetting,
   },
   reset: {
@@ -794,7 +870,7 @@ function ThemeRow() {
 }
 
 /** Resúmenes de cada fila del menú, con lo que hay guardado. */
-function summaries(settings, chart) {
+function summaries(settings, chart, reviews) {
   const options = [
     chart.splitLines && 'Ingresos y gastos',
     chart.calendar && 'Calendario',
@@ -813,6 +889,11 @@ function summaries(settings, chart) {
       : settings.goal_amount
         ? `${settings.goal_name || 'Objetivo'} · ${formatEURWhole(settings.goal_amount)}`
         : 'Sin definir',
+    reviews: !reviews
+      ? null
+      : reviews.length
+        ? { last: reviews[0], diff: savedReviewDiff(reviews[0]).diff }
+        : 'Ninguna todavía',
     investment: !settings
       ? null
       : investment
@@ -830,9 +911,9 @@ function summaries(settings, chart) {
 }
 
 function Menu({ onOpen }) {
-  const { settings, chart } = useFinanceData()
+  const { settings, chart, reviews } = useFinanceData()
   const { required: hasSession, logout } = useAuth()
-  const summary = summaries(settings.data, chart)
+  const summary = summaries(settings.data, chart, reviews.data)
   return (
     <div className="grid gap-5">
       <Group title="Preferencias">
@@ -843,6 +924,20 @@ function Menu({ onOpen }) {
         <Row icon={Wallet} label="Patrimonio inicial" summary={summary.balance} onClick={() => onOpen('balance')} />
         <Row icon={Target} label="Objetivo" summary={summary.goal} onClick={() => onOpen('goal')} />
         <Row icon={TrendingUp} label="Inversión" summary={summary.investment} onClick={() => onOpen('investment')} />
+        <Row
+          icon={CalendarCheck}
+          label="Revisiones"
+          summary={
+            summary.reviews?.last ? (
+              <>
+                Última: {reviewMonth(summary.reviews.last)} · <ReviewDiffText diff={summary.reviews.diff} />
+              </>
+            ) : (
+              summary.reviews
+            )
+          }
+          onClick={() => onOpen('reviews')}
+        />
       </Group>
       <Group title="Datos">
         <Row

@@ -88,8 +88,13 @@ export const api = {
   updateSettings: (settings) => request('/settings', { method: 'PUT', body: settings }),
   /** Cambia solo los ajustes enviados (p. ej. `{ goal_amount }`). */
   patchSettings: (changes) => request('/settings', { method: 'PATCH', body: changes }),
-  /** Copia de seguridad: ajustes y todos los flujos. */
+  /** Historial de revisiones mensuales, de la más reciente a la más antigua. */
+  listReviews: () => request('/reviews'),
+  /** Guarda la revisión (`{ review_date, forecast, actual, anchor }`) y ancla el patrimonio inicial. */
+  createReview: (review) => request('/reviews', { method: 'POST', body: review }),
+  deleteReview: (id) => request(`/reviews/${id}`, { method: 'DELETE' }),
+  /** Copia de seguridad: ajustes, flujos y revisiones. */
   exportBackup: () => request('/backup'),
-  /** Sustituye todos los datos por los de la copia; devuelve `{ flows }` (los importados). */
+  /** Sustituye todos los datos por los de la copia; devuelve `{ flows, reviews }` (los importados). */
   importBackup: (backup) => request('/backup', { method: 'PUT', body: backup }),
 }

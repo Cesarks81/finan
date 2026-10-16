@@ -1,4 +1,4 @@
-import { parseISODate, toISODate } from '@/lib/format'
+import { formatMonthYear, parseISODate, toISODate } from '@/lib/format'
 
 /**
  * Revisión mensual: se da por hecha si el patrimonio inicial está fechado en el mes en curso
@@ -28,6 +28,13 @@ export function reviewDiff(real, forecast, previous = null, today = new Date()) 
   const perDay = diff < 0 && days && days >= 2 ? -diff / days : null
   return { diff, days, perDay }
 }
+
+/** Mes de una revisión guardada: «oct 2026». */
+export const reviewMonth = (review) => formatMonthYear(review.review_date.slice(0, 7))
+
+/** Diferencia de una revisión guardada (`{ review_date, forecast, actual, previous_date }`). */
+export const savedReviewDiff = (review) =>
+  reviewDiff(Number(review.actual), Number(review.forecast), review.previous_date, parseISODate(review.review_date))
 
 /**
  * Patrimonio inicial que hay que guardar (anclado hoy, «al empezar el día») para que hoy, con los

@@ -85,6 +85,23 @@ class Settings(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
 
 
+class Review(Base):
+    """Revisión mensual: el patrimonio que preveía finan un día y el saldo real de las cuentas.
+
+    `previous_date` es la fecha del patrimonio inicial anterior a la revisión (la última vez que se
+    ajustó), para repartir la diferencia por día. Hay una por día como mucho.
+    """
+
+    __tablename__ = "reviews"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    review_date: Mapped[date] = mapped_column(Date, index=True, unique=True)
+    forecast: Mapped[Decimal] = mapped_column(Numeric(14, 2))
+    actual: Mapped[Decimal] = mapped_column(Numeric(14, 2))
+    previous_date: Mapped[date | None] = mapped_column(Date, default=None)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
 class LoginAttempt(Base):
     """Intentos fallidos de acceso por IP, para bloquear temporalmente tras varios fallos.
 

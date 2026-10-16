@@ -48,6 +48,7 @@ Todo está fusionado en `main` y no hay trabajo a medias. Últimos PR:
 | #54 | Este traspaso |
 | #55 | Copia de seguridad: exportar e importar en Ajustes → Datos |
 | #56 | «Así te afecta» recalcula la inversión y avisa de lo que se deja de invertir; «Este mes no» en el servidor; lo que sobra cada mes, de los flujos |
+| #57 | Historial de revisiones mensuales (en el modal de la revisión y en Ajustes → Revisiones) |
 
 El usuario confirmó que #53 se ve bien en su iPhone. Falta que confirme en el iPhone que «Guardar copia» abre la hoja de compartir (o descarga) y que «Elegir archivo…» deja escoger el `.json` desde Archivos.
 
@@ -111,12 +112,12 @@ Los scripts de prueba de sesiones anteriores vivían en el scratchpad y **no se 
 
 ## Limitaciones conocidas y cosas sin probar
 
+- **Pantallas bajas en móvil (≈667 px o menos, iPhone SE/8):** la gráfica tiene un alto mínimo (`min-h-40`) y, con la barra de la revisión, no cabe todo: la gráfica queda encima de la barra y no deja tocarla. Viene de #44. Pendiente de preguntar al usuario qué iPhone tiene antes de tocarlo.
 - **«Con 100 €/mes más»** (tarjeta del objetivo): suma 100 €/mes al patrimonio, pero no recalcula si esos 100 € completarían una aportación recortada a la inversión. Solo cambia algo si algún mes sobra menos que la aportación. No se ha pedido.
 
 ## Ideas que quedaron sobre la mesa
 
-Se propusieron y el usuario no las ha pedido todavía:
-- **Historial de revisiones mensuales:** guardar cada «previsto frente a real» para ver si las fugas bajan. Se le explicó en #55 y con más detalle en #56 (con un ejemplo de tres meses); pendiente de que diga si lo quiere.
+Se propusieron y el usuario no las ha pedido todavía: ninguna por ahora.
 
 Descartadas por el usuario (no volver a proponerlas):
 - **Inversión como dos tramos** (líquido + invertido) en la gráfica. Prefiere ver solo el patrimonio total.

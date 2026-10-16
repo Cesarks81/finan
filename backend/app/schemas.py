@@ -100,6 +100,34 @@ class SettingsRead(BaseModel):
     review_skipped: str | None = None
 
 
+class ReviewBase(BaseModel):
+    review_date: date = Field(description="Día de la revisión")
+    forecast: Balance = Field(description="Patrimonio que preveía finan ese día")
+    actual: Balance = Field(description="Saldo real de las cuentas ese día")
+    previous_date: date | None = Field(default=None, description="Fecha del ajuste anterior (para la fuga por día)")
+
+    @model_validator(mode="after")
+    def check_previous(self) -> "ReviewBase":
+        if self.previous_date is not None and self.previous_date >= self.review_date:
+            raise ValueError("previous_date debe ser anterior a review_date")
+        return self
+
+
+class ReviewCreate(BaseModel):
+    """«Ajustar al saldo real»: guarda la revisión y ancla el patrimonio inicial ese día."""
+
+    review_date: date = Field(default_factory=date.today, description="Día de la revisión. Por defecto, hoy")
+    forecast: Balance = Field(description="Patrimonio que preveía finan")
+    actual: Balance = Field(description="Saldo real de las cuentas")
+    anchor: Balance = Field(description="Patrimonio inicial que se guarda: el real sin los flujos de ese día")
+
+
+class ReviewRead(ReviewBase):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+
+
 class BackupSettings(SettingsPatch):
     """Ajustes guardados en una copia de seguridad: todos, con las mismas reglas que al editarlos."""
 
@@ -108,7 +136,7 @@ class BackupSettings(SettingsPatch):
 
 
 class Backup(BaseModel):
-    """Copia de seguridad completa: los ajustes guardados y todos los flujos.
+    """Copia de seguridad completa: los ajustes guardados, todos los flujos y las revisiones.
 
     Las preferencias de cada dispositivo (modo oscuro, opciones de la gráfica) no van en ella.
     """
@@ -118,10 +146,18 @@ class Backup(BaseModel):
     exported_on: date | None = Field(default=None, description="Día en que se hizo la copia")
     settings: BackupSettings
     flows: list[FlowCreate] = Field(max_length=10_000)
+    reviews: list[ReviewBase] = Field(default=[], max_length=10_000)
+
+    @model_validator(mode="after")
+    def check_reviews(self) -> "Backup":
+        if len({review.review_date for review in self.reviews}) != len(self.reviews):
+            raise ValueError("Hay dos revisiones del mismo día")
+        return self
 
 
 class BackupResult(BaseModel):
     flows: int = Field(description="Número de flujos importados")
+    reviews: int = Field(description="Número de revisiones importadas")
 
 
 class Granularity(str, enum.Enum):

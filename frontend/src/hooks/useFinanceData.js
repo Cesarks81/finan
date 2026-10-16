@@ -6,7 +6,7 @@ export const FinanceDataContext = createContext(null)
  * `version` cambia cada vez que se crea, edita o elimina un flujo (o el patrimonio inicial);
  * los componentes que leen de la API la incluyen en sus dependencias para recargarse.
  * `projections` ({ data: { D, M, A }, loading, error }) es la caché de las tres vistas de la gráfica
- * y `flows` y `settings` ({ data, loading, error }), las de la lista de flujos y el patrimonio inicial.
+ * y `flows`, `settings` y `reviews` ({ data, loading, error }), las de la lista de flujos, los ajustes y el historial de revisiones.
  * `chart` tiene las preferencias de la gráfica: `splitLines`, `calendar` y sus `set…`.
  */
 export function useFinanceData() {
