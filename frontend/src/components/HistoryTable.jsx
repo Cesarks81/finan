@@ -132,13 +132,15 @@ function SectionTabs({ value, onChange }) {
 
 /**
  * Historial de los flujos (variables, fijos y los ya terminados) y, en la otra pestaña, las
- * inversiones (`InvestmentList`). En PC va debajo de la gráfica, como tabla; en móvil ocupa su
- * propia pantalla (botón del encabezado), como lista.
+ * inversiones (`InvestmentList`). En PC va debajo de la gráfica, como tabla, con las dos pestañas;
+ * en móvil ocupa su propia pantalla, como lista, y la sección la fija `section` (cada una tiene su
+ * botón en el encabezado), así que en vez de pestañas el título solo dice cuál es.
  */
-export function HistoryTable({ onEdit, onOpenInvestment, onEditInvestment, className }) {
+export function HistoryTable({ section: fixedSection, onEdit, onOpenInvestment, onEditInvestment, className }) {
   const isDesktop = useIsDesktop()
   const { refresh, flows, investments } = useFinanceData()
-  const [section, setSection] = useState('history')
+  const [tab, setTab] = useState('history')
+  const section = fixedSection ?? tab
   const showInvestments = section === 'investments'
   const { data: allFlows, error, loading } = flows
   const [filterValue, setFilterValue] = useState('variable')
@@ -186,7 +188,13 @@ export function HistoryTable({ onEdit, onOpenInvestment, onEditInvestment, class
     >
       <CardHeader className="px-4 md:px-6">
         <CardTitle className="flex min-h-8 items-center gap-2">
-          <SectionTabs value={section} onChange={setSection} />
+          {fixedSection ? (
+            <h2 className="text-sm font-semibold tracking-wide uppercase">
+              {SECTIONS.find((item) => item.value === section).label}
+            </h2>
+          ) : (
+            <SectionTabs value={section} onChange={setTab} />
+          )}
           {(showInvestments ? investments.loading : loading) && (
             <LoaderCircle className="text-muted-foreground size-3.5 animate-spin opacity-60" aria-label="Cargando" />
           )}
