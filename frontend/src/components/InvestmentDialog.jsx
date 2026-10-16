@@ -15,16 +15,68 @@ import {
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useFinanceData } from '@/hooks/useFinanceData'
-import { formatEURWhole, formatMonthYear, toISODate } from '@/lib/format'
+import { formatDate, formatEURWhole, formatMonthYear, parseISODate, toISODate } from '@/lib/format'
 import { contributionPlan, freeFor, wanted } from '@/lib/investment'
+import { usualSpending } from '@/lib/metrics'
 import { cn } from '@/lib/utils'
 
 /**
+ * De dónde salen los gastos medios: «120 € en gastos variables (media de los últimos 3 meses) y
+ * 30 € que se te escapan (tus revisiones)».
+ */
+function spendingText(spending) {
+  const variable = `${formatEURWhole(spending.variable)} en gastos variables (${
+    spending.since ? `desde el ${formatDate(spending.since)}` : 'media de los últimos 3 meses'
+  })`
+  const leak = `${formatEURWhole(spending.leak)} que se te escapan (tus revisiones)`
+  if (Math.round(spending.leak) === 0) return variable
+  if (Math.round(spending.variable) === 0) return leak
+  return `${variable} y ${leak}`
+}
+
+/**
+ * Cuánto se recomienda aportar: lo máximo que se puede todos los meses menos lo que sueles gastar
+ * sin planificar (`usualSpending`), que se deja libre, en decenas. Sin datos, invita a apuntarlos.
+ */
+function Recommendation({ max, spending, monthly, onUse }) {
+  if (spending === null) {
+    return (
+      <p className="text-muted-foreground m-0 leading-relaxed">
+        Apunta tus gastos variables (GVM) y te recomendaré cuánto aportar dejando margen para ellos.
+      </p>
+    )
+  }
+  const recommended = Math.floor(Math.max(0, max - spending.total) / 10) * 10
+  return (
+    <div className="grid gap-0.5">
+      <p className="m-0 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+        <span className="text-muted-foreground">
+          Recomendado:{' '}
+          <span className="text-foreground font-semibold tabular-nums">{formatEURWhole(recommended)}/mes</span>
+        </span>
+        {recommended > 0 && monthly !== recommended && (
+          <button type="button" onClick={() => onUse(recommended)} className="text-chart-1 font-medium hover:underline">
+            Usar
+          </button>
+        )}
+      </p>
+      <p className="text-muted-foreground m-0 leading-relaxed">
+        {recommended > 0
+          ? `Así te quedan unos ${formatEURWhole(spending.total)}/mes para lo que sueles gastar sin planificar`
+          : `Lo que te sobra no llega a cubrir lo que sueles gastar sin planificar, unos ${formatEURWhole(spending.total)}/mes`}
+        {spending.total >= 1 ? `: ${spendingText(spending)}.` : '.'}
+      </p>
+    </div>
+  )
+}
+
+/**
  * Plan de aportaciones según lo escrito en el formulario: cuánto se puede aportar como mucho
- * todos los meses (lo libre el mes más justo) y, mes a mes, lo libre y lo que se aporta.
+ * todos los meses (lo libre el mes más justo), cuánto se recomienda (`Recommendation`) y, mes a
+ * mes, lo libre y lo que se aporta.
  * `shared`: hay otras inversiones, así que lo libre es lo que sobra menos lo que aportan ellas.
  */
-function ContributionPlan({ plan, monthly, until, shared, onUseMax }) {
+function ContributionPlan({ plan, monthly, until, shared, spending, onUseMax, onUse }) {
   if (!plan.rows.length) return null
   const period = until ? `hasta ${formatMonthYear(plan.rows.at(-1).month)}` : 'los próximos 12 meses'
   const short = plan.max !== null && monthly > plan.max
@@ -43,6 +95,9 @@ function ContributionPlan({ plan, monthly, until, shared, onUseMax }) {
           </button>
         )}
       </p>
+      {plan.max !== null && plan.max > 0 && spending !== undefined && (
+        <Recommendation max={plan.max} spending={spending} monthly={monthly} onUse={onUse} />
+      )}
       {short && (
         <p className="text-expense m-0 leading-relaxed">
           Algunos meses no te sobra tanto: esos meses se aporta solo lo que sobre
@@ -103,10 +158,11 @@ const clean = (value) => String(value).trim().replace(',', '.')
  *
  * Lo invertido sale de lo que tienes y lo que aportas, de lo que sobra, así que cada fila dice
  * debajo cuánto queda libre (descontando las demás inversiones) y no deja pasarse. Debajo de la
- * aportación, el plan: lo máximo que se puede aportar y el mes a mes.
+ * aportación, el plan: lo máximo que se puede aportar, lo recomendado (dejando libre lo que sueles
+ * gastar sin planificar) y el mes a mes.
  */
 function InvestmentForm({ row, onDone }) {
-  const { refresh, investments, wallet, surplus, projections } = useFinanceData()
+  const { refresh, investments, wallet, surplus, projections, flows, reviews } = useFinanceData()
   const [today] = useState(() => toISODate(new Date()))
   const list = investments.list ?? []
   const current = row ? list.find((investment) => investment.id === row.id) : null
@@ -140,6 +196,8 @@ function InvestmentForm({ row, onDone }) {
   const plan = surplus
     ? contributionPlan({ amount, monthly, rate: 0, date: today, until: form.until || null }, others, surplus)
     : { rows: [], max: null, total: 0 }
+  // Lo que sueles gastar sin planificar, para recomendar cuánto aportar (undefined mientras carga).
+  const spending = flows.data && reviews.data ? usualSpending(flows.data, reviews.data, parseISODate(today)) : undefined
 
   async function handleSubmit(event) {
     event.preventDefault()
@@ -273,7 +331,9 @@ function InvestmentForm({ row, onDone }) {
           monthly={monthly}
           until={form.until}
           shared={others.some((investment) => investment.monthly > 0)}
+          spending={spending}
           onUseMax={() => setForm((f) => ({ ...f, monthly: String(Math.floor(plan.max)) }))}
+          onUse={(value) => setForm((f) => ({ ...f, monthly: String(value) }))}
         />
       </div>
 
