@@ -27,7 +27,7 @@ import { Switch } from '@/components/ui/switch'
 import { useAuth } from '@/hooks/useAuth'
 import { useApiQuery, useFinanceData } from '@/hooks/useFinanceData'
 import { useTheme } from '@/hooks/useTheme'
-import { backupFile, readBackup, saveFile } from '@/lib/backup'
+import { applyChartBackup, backupFile, chartBackup, chartBackupText, readBackup, saveFile } from '@/lib/backup'
 import { formatDate, formatEURWhole, toISODate } from '@/lib/format'
 import { reviewMonth, savedReviewDiff } from '@/lib/review'
 import { cn } from '@/lib/utils'
@@ -346,12 +346,13 @@ function ResetSetting() {
 }
 
 /**
- * Copia de seguridad: guardar en un archivo los ajustes y todos los flujos, o importar uno, que
- * sustituye todos los datos tras confirmarlo. La copia se pide al abrir la pantalla para que el
+ * Copia de seguridad: guardar en un archivo los ajustes, todos los datos y las opciones de la
+ * gráfica de este dispositivo, o importar uno, que lo sustituye todo tras confirmarlo (las opciones
+ * de la gráfica, solo si la copia las trae). La copia se pide al abrir la pantalla para que el
  * botón la guarde sin esperas (en el móvil, compartir solo se permite justo al tocar).
  */
 function BackupSetting() {
-  const { version, refresh, flows } = useFinanceData()
+  const { version, refresh, flows, chart } = useFinanceData()
   const backup = useApiQuery(api.exportBackup, [version])
   const input = useRef(null)
   const [pending, setPending] = useState(null) // copia leída del archivo, a falta de confirmar
@@ -377,6 +378,7 @@ function BackupSetting() {
     setError(null)
     try {
       const { flows: imported } = await api.importBackup(pending)
+      if (pending.chart) applyChartBackup(pending.chart, chart)
       refresh()
       setPending(null)
       setStatus({ imported })
@@ -394,10 +396,20 @@ function BackupSetting() {
         <div className="grid min-w-48 flex-1 gap-1">
           <p className="text-sm font-medium">Exportar</p>
           <p className="text-muted-foreground text-xs">
-            {backup.data ? `Tus ${flowCount(backup.data.flows.length)} y tus ajustes, en un archivo.` : 'Preparando la copia…'}
+            {backup.data
+              ? `${backup.data.flows.length === 1 ? 'Tu flujo' : `Tus ${flowCount(backup.data.flows.length)}`} y tus ajustes, en un archivo.`
+              : 'Preparando la copia…'}
+          </p>
+          <p className="text-muted-foreground text-xs">
+            Opciones de la gráfica: {chartBackupText(chartBackup(chart))}.
           </p>
         </div>
-        <Button variant="outline" onClick={() => saveFile(backupFile(backup.data))} disabled={!backup.data} className="ml-auto">
+        <Button
+          variant="outline"
+          onClick={() => saveFile(backupFile(backup.data, chart))}
+          disabled={!backup.data}
+          className="ml-auto"
+        >
           <Download />
           Guardar copia
         </Button>
@@ -430,9 +442,11 @@ function BackupSetting() {
           <div className="border-destructive/40 grid gap-3 rounded-lg border p-3">
             <p className="text-sm">
               Copia {pending.exported_on ? `del ${formatDate(pending.exported_on)} ` : ''}con{' '}
-              {flowCount(pending.flows.length)}. Sustituirá todo lo que tienes ahora ({flowCount(flows.data?.length ?? 0)},
-              patrimonio inicial, objetivo, inversiones y revisiones). No se puede deshacer: si quieres conservarlo, guarda
-              antes una copia.
+              {flowCount(pending.flows.length)}
+              {pending.chart && ` y estas opciones de la gráfica: ${chartBackupText(pending.chart)}`}. Sustituirá todo lo
+              que tienes ahora ({flowCount(flows.data?.length ?? 0)}, patrimonio inicial, objetivo, inversiones
+              {pending.chart ? ', revisiones y opciones de la gráfica de este dispositivo' : ' y revisiones'}). No se puede
+              deshacer: si quieres conservarlo, guarda antes una copia.
             </p>
             <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
               <Button variant="outline" onClick={() => setPending(null)} disabled={status === 'importing'}>
@@ -644,7 +658,7 @@ const PAGES = {
   backup: {
     title: 'Copia de seguridad',
     description:
-      'Guarda en un archivo tus flujos, el patrimonio inicial, el objetivo, tus inversiones y tus revisiones, y recupéralos cuando quieras, en este dispositivo o en otro. El modo oscuro y las opciones de la gráfica no van en la copia: son de cada dispositivo.',
+      'Guarda en un archivo tus flujos, el patrimonio inicial, el objetivo, tus inversiones, tus revisiones y las opciones de la gráfica (como la inflación de «Euros de hoy»), y recupéralos cuando quieras, en este dispositivo o en otro. El modo oscuro no va en la copia: es de cada dispositivo.',
     Content: BackupSetting,
   },
   reset: {
