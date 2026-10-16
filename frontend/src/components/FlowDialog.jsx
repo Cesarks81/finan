@@ -103,6 +103,9 @@ function ImpactRow({ label, before, after, tone }) {
   )
 }
 
+/** Al editar un flujo, poner el importe a 0 € es quitarlo: al guardar se elimina (tras confirmarlo). */
+const isRemoval = (form, flow) => Boolean(flow) && String(form.amount).trim() !== '' && Number(toPayload(form).amount) === 0
+
 const euros = new Intl.NumberFormat('es-ES', { maximumFractionDigits: 0 })
 
 /**
@@ -135,15 +138,18 @@ function contributionText(change) {
 function ImpactPreview({ form, flow }) {
   const { settings, projections, surplus } = useFinanceData()
   const candidate = toPayload(form)
+  // Al editar, 0 € es quitar el flujo: se ve cómo queda sin él.
+  const removing = isRemoval(form, flow)
   const complete =
-    Number(candidate.amount) > 0 &&
+    removing ||
+    (Number(candidate.amount) > 0 &&
     ISO_DATE.test(candidate.start_date) &&
     (form.variableMode !== 'months' || candidate.duration_months >= 1) &&
-    (form.variableMode !== 'until' || ISO_DATE.test(candidate.end_date ?? ''))
+    (form.variableMode !== 'until' || ISO_DATE.test(candidate.end_date ?? '')))
   const long = projections.data?.long
   if (!complete || !long || !settings.data) return null
 
-  const candidateFlow = { ...candidate, is_recurring: isRecurringFlow(candidate) }
+  const candidateFlow = removing ? null : { ...candidate, is_recurring: isRecurringFlow(candidate) }
   const balanceDate = settings.data.balance_date
   const investment = surplus ? investmentOf(settings.data) : null
   const invest = investment
@@ -200,8 +206,15 @@ function FlowForm({ flow, defaultType, onDone }) {
   const set = (field) => (eventOrValue) =>
     setForm((current) => ({ ...current, [field]: eventOrValue?.target ? eventOrValue.target.value : eventOrValue }))
 
+  const removing = isRemoval(form, flow)
+
   async function handleSubmit(event) {
     event.preventDefault()
+    // Guardar un flujo a 0 € es eliminarlo: se pide la misma confirmación que con «Eliminar».
+    if (removing) {
+      setConfirmingDelete(true)
+      return
+    }
     const payload = toPayload(form)
     if (!payload.concept) {
       setError('Escribe un concepto.')
@@ -274,7 +287,7 @@ function FlowForm({ flow, defaultType, onDone }) {
               id="flow-amount"
               type="number"
               inputMode="decimal"
-              min="0.01"
+              min={flow ? '0' : '0.01'}
               step="0.01"
               value={form.amount}
               onChange={set('amount')}
@@ -379,7 +392,8 @@ function FlowForm({ flow, defaultType, onDone }) {
       {confirmingDelete ? (
         <div className="grid gap-3 rounded-lg border border-destructive/40 p-3">
           <p className="text-sm">
-            ¿Eliminar «{flow.concept}»? La gráfica se recalculará sin él. No se puede deshacer.
+            {removing ? 'Con 0 €, ¿eliminar' : '¿Eliminar'} «{flow.concept}»? La gráfica se recalculará sin él. No se
+            puede deshacer.
           </p>
           <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
             <Button type="button" variant="outline" onClick={() => setConfirmingDelete(false)} disabled={saving}>

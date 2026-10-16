@@ -87,14 +87,15 @@ export function extraSavingShift(investment, balanceDate, surplus, lastMonth, ex
 }
 
 /**
- * Cómo cambia la fecha del objetivo si se añade `candidate` (y, al editar, se quita `previous`).
+ * Cómo cambia la fecha del objetivo si se añade `candidate` (y, al editar, se quita `previous`;
+ * sin `candidate`, solo se quita: un flujo editado a 0 €).
  * `anchor` es la fecha del patrimonio inicial (`balance_date`, o null). `investmentShift` (fecha →
  * €), si hay inversión, es lo que cambia su rentabilidad porque el flujo cambia lo que se aporta
  * (`investmentImpact` en `lib/investment.js`). Devuelve `{ before, after, delta }` (meses; null si
  * alguna fecha no se alcanza).
  */
 export function goalImpact(longPoints, goalAmount, candidate, previous = null, anchor = null, investmentShift = null) {
-  const add = flowContribution(candidate, longPoints, anchor)
+  const add = candidate ? flowContribution(candidate, longPoints, anchor) : longPoints.map(() => 0)
   const remove = previous ? flowContribution(previous, longPoints, anchor) : null
   const adjust = add.map(
     (value, i) =>
