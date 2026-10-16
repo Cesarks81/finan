@@ -569,8 +569,19 @@ function ContributionPlan({ plan, monthly, until, onUseMax }) {
  * (con lo que ha rendido y aportado), y al guardar se toma esa cifra como punto de partida con
  * fecha de hoy. Debajo de la aportación, el plan: lo máximo que se puede aportar y el mes a mes.
  */
+/** Línea bajo una fila del formulario: tenue, o en rojo si el valor se pasa del tope. */
+function LimitHint({ over, children }) {
+  return <p className={cn('-mt-2 text-xs', over ? 'text-expense' : 'text-muted-foreground')}>{children}</p>
+}
+
+// Mes siguiente a una fecha 'YYYY-MM-DD', como 'YYYY-MM'.
+function nextMonthOf(iso) {
+  const [year, month] = iso.split('-').map(Number)
+  return toISODate(new Date(year, month, 1)).slice(0, 7)
+}
+
 function InvestmentForm({ settings }) {
-  const { refresh, investmentValueAt, surplus } = useFinanceData()
+  const { refresh, investmentValueAt, surplus, projections } = useFinanceData()
   const [today] = useState(() => toISODate(new Date()))
   const current = investmentOf(settings)
   const [form, setForm] = useState(() => ({
@@ -589,6 +600,15 @@ function InvestmentForm({ settings }) {
   const clean = (value) => String(value).trim().replace(',', '.')
 
   const monthly = Number(clean(form.monthly)) || 0
+  const amount = Number(clean(form.amount)) || 0
+  // Topes: lo invertido sale de lo que tienes (el patrimonio de hoy) y la aportación, de lo que te
+  // sobra el mes que viene (el de la primera aportación). Los meses que sobre menos, se aporta lo
+  // que sobre (el mes a mes lo marca en rojo).
+  const todayBalance = projections.data?.todayBalance
+  const netWorth = todayBalance === undefined ? null : Math.max(0, Number(todayBalance))
+  const freeNext = surplus ? Math.max(0, surplus.get(nextMonthOf(today)) ?? 0) : null
+  const amountOver = netWorth !== null && amount > netWorth
+  const monthlyOver = freeNext !== null && monthly > freeNext
   const plan = surplus
     ? contributionPlan({ monthly, date: today, until: form.until || null }, surplus)
     : { rows: [], max: null, total: 0 }
@@ -632,9 +652,12 @@ function InvestmentForm({ settings }) {
             type="number"
             inputMode="decimal"
             min="0"
+            max={netWorth?.toFixed(2)}
             step="0.01"
             value={form.amount}
             onChange={edit('amount')}
+            aria-invalid={amountOver}
+            aria-describedby="invest-amount-limit"
             required
           />
         </div>
@@ -653,6 +676,15 @@ function InvestmentForm({ settings }) {
           />
         </div>
       </div>
+      {netWorth !== null && (
+        <LimitHint over={amountOver}>
+          <span id="invest-amount-limit">
+            {amountOver
+              ? `No puedes invertir más de lo que tienes hoy: ${formatEURWhole(netWorth)}.`
+              : `Hoy tienes ${formatEURWhole(netWorth)}${amount > 0 ? ` · te quedan ${formatEURWhole(netWorth - amount)} sin invertir` : ''}.`}
+          </span>
+        </LimitHint>
+      )}
       <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] items-end gap-4">
         <div className="grid gap-2">
           <Label htmlFor="invest-monthly">Aportas al mes (€)</Label>
@@ -661,9 +693,12 @@ function InvestmentForm({ settings }) {
             type="number"
             inputMode="decimal"
             min="0"
+            max={freeNext?.toFixed(2)}
             step="0.01"
             value={form.monthly}
             onChange={edit('monthly')}
+            aria-invalid={monthlyOver}
+            aria-describedby="invest-monthly-limit"
           />
         </div>
         <div className="grid gap-2">
@@ -677,6 +712,17 @@ function InvestmentForm({ settings }) {
           />
         </div>
       </div>
+      {freeNext !== null && (
+        <LimitHint over={monthlyOver}>
+          <span id="invest-monthly-limit">
+            {monthlyOver
+              ? `No puedes aportar más de lo que te sobra el mes que viene: ${formatEURWhole(freeNext)}.`
+              : freeNext === 0
+                ? 'El mes que viene no te sobra nada para aportar.'
+                : `El mes que viene te sobran ${formatEURWhole(freeNext)}${monthly > 0 ? ` · te quedan ${formatEURWhole(freeNext - monthly)} libres` : ''}.`}
+          </span>
+        </LimitHint>
+      )}
       <ContributionPlan
         plan={plan}
         monthly={monthly}
@@ -803,7 +849,7 @@ const PAGES = {
   investment: {
     title: 'Inversión',
     description:
-      'Qué parte de tu patrimonio está en fondos, acciones o similares (ya cuenta dentro de tu patrimonio). Solo esa parte crece con la rentabilidad. Cada mes se aporta lo que indiques, hasta la fecha que elijas, pero nunca más de lo que te sobra ese mes: debajo ves el máximo y el mes a mes.',
+      'Qué parte de tu patrimonio está en fondos, acciones o similares (ya cuenta dentro de tu patrimonio). Solo esa parte crece con la rentabilidad. No puedes invertir más de lo que tienes ni aportar más de lo que te sobra; si algún mes sobra menos, ese mes se aporta solo lo que sobre.',
     Content: InvestmentSetting,
   },
   reviews: {
