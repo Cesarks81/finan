@@ -58,6 +58,10 @@ class FlowRead(FlowBase):
 class SettingsUpdate(BaseModel):
     initial_balance: Balance = Field(description="Patrimonio neto al empezar balance_date; puede ser negativo")
     balance_date: date = Field(default_factory=date.today, description="Fecha de ese patrimonio. Por defecto, hoy")
+    remove_investments: bool = Field(
+        default=False,
+        description="Confirma que, al cambiar el patrimonio inicial, se eliminan las inversiones que salen de él",
+    )
 
 
 class SettingsPatch(BaseModel):

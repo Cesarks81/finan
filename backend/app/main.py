@@ -171,10 +171,27 @@ def read_settings(db: DbSession) -> models.Settings:
 
 @private.put("/settings", response_model=schemas.SettingsRead, tags=["ajustes"])
 def update_settings(payload: schemas.SettingsUpdate, db: DbSession) -> models.Settings:
-    """Patrimonio inicial y su fecha (el resto de ajustes se conserva)."""
+    """Patrimonio inicial y su fecha (el resto de ajustes se conserva).
+
+    Las inversiones con capital (lo invertido, `amount` > 0) salen del patrimonio inicial, así que
+    cambiarlo una vez fijado las elimina, en la misma transacción. Hay que confirmarlo con
+    `remove_investments`; sin él, 409 y no cambia nada. Las que solo reciben aportaciones se quedan.
+    """
     settings = db.merge(load_settings(db))
-    for field, value in payload.model_dump().items():
-        setattr(settings, field, value)
+    changed = settings.balance_date is not None and (
+        settings.initial_balance != payload.initial_balance or settings.balance_date != payload.balance_date
+    )
+    if changed:
+        funded = db.scalars(select(models.Investment).where(models.Investment.amount > 0)).all()
+        if funded and not payload.remove_investments:
+            raise HTTPException(
+                status.HTTP_409_CONFLICT,
+                "Cambiar el patrimonio inicial elimina las inversiones que salen de él: confírmalo",
+            )
+        for investment in funded:
+            db.delete(investment)
+    settings.initial_balance = payload.initial_balance
+    settings.balance_date = payload.balance_date
     db.commit()
     db.refresh(settings)
     return settings
