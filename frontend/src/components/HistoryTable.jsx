@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ChevronRight, LoaderCircle, Pencil, Trash2 } from 'lucide-react'
+import { ChevronRight, LoaderCircle, Pencil, Plus, Trash2 } from 'lucide-react'
 
 import { api } from '@/api/client'
 import {
@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Badge } from '@/components/ui/badge'
 import { Button, buttonVariants } from '@/components/ui/button'
+import { InvestmentList } from '@/components/InvestmentList'
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
@@ -101,13 +102,44 @@ function MobileHistoryList({ rows, onEdit }) {
   )
 }
 
+const SECTIONS = [
+  { value: 'history', label: 'Historial' },
+  { value: 'investments', label: 'Inversiones' },
+]
+
+/** Pestañas del título: «HISTORIAL · INVERSIONES»; la activa resalta y la otra queda tenue. */
+function SectionTabs({ value, onChange }) {
+  return (
+    <div role="tablist" aria-label="Sección" className="flex items-center gap-4">
+      {SECTIONS.map((section) => (
+        <button
+          key={section.value}
+          type="button"
+          role="tab"
+          aria-selected={value === section.value}
+          onClick={() => onChange(section.value)}
+          className={cn(
+            'text-sm font-semibold tracking-wide uppercase transition-colors',
+            value === section.value ? 'text-foreground' : 'text-muted-foreground hover:text-foreground',
+          )}
+        >
+          {section.label}
+        </button>
+      ))}
+    </div>
+  )
+}
+
 /**
- * Historial de los flujos: variables, fijos y los ya terminados. En PC va debajo de la gráfica,
- * como tabla; en móvil ocupa su propia pantalla (botón del encabezado), como lista.
+ * Historial de los flujos (variables, fijos y los ya terminados) y, en la otra pestaña, las
+ * inversiones (`InvestmentList`). En PC va debajo de la gráfica, como tabla; en móvil ocupa su
+ * propia pantalla (botón del encabezado), como lista.
  */
-export function HistoryTable({ onEdit, className }) {
+export function HistoryTable({ onEdit, onEditInvestment, className }) {
   const isDesktop = useIsDesktop()
-  const { refresh, flows } = useFinanceData()
+  const { refresh, flows, investments } = useFinanceData()
+  const [section, setSection] = useState('history')
+  const showInvestments = section === 'investments'
   const { data: allFlows, error, loading } = flows
   const [filterValue, setFilterValue] = useState('variable')
   const filter = FILTERS.find((f) => f.value === filterValue)
@@ -135,94 +167,111 @@ export function HistoryTable({ onEdit, className }) {
       )}
     >
       <CardHeader className="px-4 md:px-6">
-        <CardTitle className="flex items-center gap-2 text-sm tracking-wide uppercase">
-          Historial
-          {loading && <LoaderCircle className="text-muted-foreground size-3.5 animate-spin opacity-60" aria-label="Cargando" />}
+        <CardTitle className="flex min-h-8 items-center gap-2">
+          <SectionTabs value={section} onChange={setSection} />
+          {(showInvestments ? investments.loading : loading) && (
+            <LoaderCircle className="text-muted-foreground size-3.5 animate-spin opacity-60" aria-label="Cargando" />
+          )}
         </CardTitle>
         <CardAction>
-          <ToggleGroup
-            type="single"
-            size="sm"
-            variant="outline"
-            value={filterValue}
-            onValueChange={(next) => next && setFilterValue(next)}
-            aria-label="Filtrar el historial"
-          >
-            {FILTERS.map((f) => (
-              <ToggleGroupItem key={f.value} value={f.value} className="px-3 text-xs">
-                {f.label}
-              </ToggleGroupItem>
-            ))}
-          </ToggleGroup>
+          {showInvestments ? (
+            investments.list?.length > 0 && (
+              <Button variant="outline" size="sm" onClick={() => onEditInvestment(null)}>
+                <Plus />
+                Añadir
+              </Button>
+            )
+          ) : (
+            <ToggleGroup
+              type="single"
+              size="sm"
+              variant="outline"
+              value={filterValue}
+              onValueChange={(next) => next && setFilterValue(next)}
+              aria-label="Filtrar el historial"
+            >
+              {FILTERS.map((f) => (
+                <ToggleGroupItem key={f.value} value={f.value} className="px-3 text-xs">
+                  {f.label}
+                </ToggleGroupItem>
+              ))}
+            </ToggleGroup>
+          )}
         </CardAction>
       </CardHeader>
       <CardContent className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 md:overflow-visible md:px-6">
-        {(error || deleteError) && (
-          <p role="alert" className="text-destructive mb-3 text-sm">
-            {deleteError ?? error.message}
-          </p>
-        )}
-        {rows && rows.length === 0 ? (
-          <p className="text-muted-foreground py-8 text-center text-sm">
-            {filter.empty}
-          </p>
+        {showInvestments ? (
+          <InvestmentList onEdit={onEditInvestment} />
         ) : (
-          rows &&
-          (!isDesktop ? (
-            <MobileHistoryList rows={rows} onEdit={onEdit} />
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Fecha</TableHead>
-                  <TableHead>Tipo</TableHead>
-                  <TableHead className="w-full">Concepto</TableHead>
-                  <TableHead>Periodicidad</TableHead>
-                  <TableHead className="text-right">Importe</TableHead>
-                  <TableHead>
-                    <span className="sr-only">Acciones</span>
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {rows.map(({ flow, schedule }) => {
-                  return (
-                    <TableRow key={flow.id}>
-                      <TableCell className="text-muted-foreground">{formatDate(flow.start_date)}</TableCell>
-                      <TableCell>
-                        <TypeBadge flow={flow} />
-                      </TableCell>
-                      <TableCell className="max-w-0 truncate font-medium" title={flow.concept}>
-                        {flow.concept}
-                      </TableCell>
-                      <TableCell>
-                        <ScheduleBadge schedule={schedule} />
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Amount flow={flow} />
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex justify-end gap-1">
-                          <Button variant="ghost" size="icon-sm" onClick={() => onEdit(flow)} aria-label={`Editar ${flow.concept}`}>
-                            <Pencil />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon-sm"
-                            onClick={() => setToDelete(flow)}
-                            aria-label={`Eliminar ${flow.concept}`}
-                            className="hover:text-destructive"
-                          >
-                            <Trash2 />
-                          </Button>
-                        </div>
-                      </TableCell>
+          <>
+            {(error || deleteError) && (
+              <p role="alert" className="text-destructive mb-3 text-sm">
+                {deleteError ?? error.message}
+              </p>
+            )}
+            {rows && rows.length === 0 ? (
+              <p className="text-muted-foreground py-8 text-center text-sm">
+                {filter.empty}
+              </p>
+            ) : (
+              rows &&
+              (!isDesktop ? (
+                <MobileHistoryList rows={rows} onEdit={onEdit} />
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Fecha</TableHead>
+                      <TableHead>Tipo</TableHead>
+                      <TableHead className="w-full">Concepto</TableHead>
+                      <TableHead>Periodicidad</TableHead>
+                      <TableHead className="text-right">Importe</TableHead>
+                      <TableHead>
+                        <span className="sr-only">Acciones</span>
+                      </TableHead>
                     </TableRow>
-                  )
-                })}
-              </TableBody>
-            </Table>
-          ))
+                  </TableHeader>
+                  <TableBody>
+                    {rows.map(({ flow, schedule }) => {
+                      return (
+                        <TableRow key={flow.id}>
+                          <TableCell className="text-muted-foreground">{formatDate(flow.start_date)}</TableCell>
+                          <TableCell>
+                            <TypeBadge flow={flow} />
+                          </TableCell>
+                          <TableCell className="max-w-0 truncate font-medium" title={flow.concept}>
+                            {flow.concept}
+                          </TableCell>
+                          <TableCell>
+                            <ScheduleBadge schedule={schedule} />
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Amount flow={flow} />
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex justify-end gap-1">
+                              <Button variant="ghost" size="icon-sm" onClick={() => onEdit(flow)} aria-label={`Editar ${flow.concept}`}>
+                                <Pencil />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon-sm"
+                                onClick={() => setToDelete(flow)}
+                                aria-label={`Eliminar ${flow.concept}`}
+                                className="hover:text-destructive"
+                              >
+                                <Trash2 />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      )
+                    })}
+                  </TableBody>
+                </Table>
+              ))
+            )}
+          </>
         )}
       </CardContent>
 

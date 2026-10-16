@@ -88,13 +88,18 @@ export const api = {
   updateSettings: (settings) => request('/settings', { method: 'PUT', body: settings }),
   /** Cambia solo los ajustes enviados (p. ej. `{ goal_amount }`). */
   patchSettings: (changes) => request('/settings', { method: 'PATCH', body: changes }),
+  listInvestments: () => request('/investments'),
+  /** `{ name, amount, monthly, annual_return, start_date, until }`: lo invertido cuenta desde `start_date`. */
+  createInvestment: (investment) => request('/investments', { method: 'POST', body: investment }),
+  updateInvestment: (id, investment) => request(`/investments/${id}`, { method: 'PUT', body: investment }),
+  deleteInvestment: (id) => request(`/investments/${id}`, { method: 'DELETE' }),
   /** Historial de revisiones mensuales, de la más reciente a la más antigua. */
   listReviews: () => request('/reviews'),
   /** Guarda la revisión (`{ review_date, forecast, actual, anchor }`) y ancla el patrimonio inicial. */
   createReview: (review) => request('/reviews', { method: 'POST', body: review }),
   deleteReview: (id) => request(`/reviews/${id}`, { method: 'DELETE' }),
-  /** Copia de seguridad: ajustes, flujos y revisiones. */
+  /** Copia de seguridad: ajustes, flujos, inversiones y revisiones. */
   exportBackup: () => request('/backup'),
-  /** Sustituye todos los datos por los de la copia; devuelve `{ flows, reviews }` (los importados). */
+  /** Sustituye todos los datos por los de la copia; devuelve `{ flows, investments, reviews }` (los importados). */
   importBackup: (backup) => request('/backup', { method: 'PUT', body: backup }),
 }

@@ -19,7 +19,7 @@ import { useFinanceData } from '@/hooks/useFinanceData'
 import { FIXED_TYPES, FLOW_ORDER, FLOW_TYPES, VARIABLE_TYPES, isRecurringFlow } from '@/lib/flowTypes'
 import { formatEURWhole, formatMonthYear, toISODate } from '@/lib/format'
 import { goalImpact } from '@/lib/goal'
-import { investmentImpact, investmentOf, surplusWith } from '@/lib/investment'
+import { investmentImpact, surplusWith } from '@/lib/investment'
 import { cn } from '@/lib/utils'
 
 // Periodicidad de un flujo variable (GVM / IVM): puntual o temporal (durante N meses / hasta una fecha).
@@ -136,7 +136,7 @@ function contributionText(change) {
  * completarlas. Nada si no cambia ninguna de las dos o si el formulario aún no está completo.
  */
 function ImpactPreview({ form, flow }) {
-  const { settings, projections, surplus } = useFinanceData()
+  const { settings, projections, surplus, investments } = useFinanceData()
   const candidate = toPayload(form)
   // Al editar, 0 € es quitar el flujo: se ve cómo queda sin él.
   const removing = isRemoval(form, flow)
@@ -151,10 +151,10 @@ function ImpactPreview({ form, flow }) {
 
   const candidateFlow = removing ? null : { ...candidate, is_recurring: isRecurringFlow(candidate) }
   const balanceDate = settings.data.balance_date
-  const investment = surplus ? investmentOf(settings.data) : null
-  const invest = investment
-    ? investmentImpact(investment, balanceDate, surplus, surplusWith(surplus, candidateFlow, flow), long.at(-1).period)
-    : null
+  const invest =
+    surplus && investments.list?.length
+      ? investmentImpact(investments.list, balanceDate, surplus, surplusWith(surplus, candidateFlow, flow), long.at(-1).period)
+      : null
   const change = invest?.change && Math.abs(invest.change.total) >= 1 ? invest.change : null
 
   const goal = settings.data.goal_amount
@@ -165,6 +165,9 @@ function ImpactPreview({ form, flow }) {
   const text = (month) => (month ? formatMonthYear(month) : 'más de 40 años')
   const later = goalChange && (goalChange.delta === null ? !goalChange.after : goalChange.delta > 0)
   const ChangeIcon = change?.total < 0 ? TrendingDown : TrendingUp
+  const yourContribution =
+    change &&
+    `${investments.list.length > 1 ? 'tus aportaciones' : 'tu aportación'} de ${formatEURWhole(change.monthly)}`
 
   return (
     <section aria-label="Así te afecta" className="bg-muted/60 grid gap-2.5 rounded-lg px-3.5 py-3">
@@ -184,8 +187,8 @@ function ImpactPreview({ form, flow }) {
             {contributionText(change)}{' '}
             <span className="text-muted-foreground">
               {change.total < 0
-                ? `${change.count === 1 ? 'Ese mes' : 'Esos meses'} no te sobra para tu aportación de ${formatEURWhole(investment.monthly)}.`
-                : `Te sobra más para completar tu aportación de ${formatEURWhole(investment.monthly)}.`}
+                ? `${change.count === 1 ? 'Ese mes' : 'Esos meses'} no te sobra para ${yourContribution}.`
+                : `Te sobra más para completar ${yourContribution}.`}
             </span>
           </span>
         </p>

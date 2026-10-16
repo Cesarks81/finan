@@ -70,12 +70,12 @@ export function goalForecast(longPoints, goalAmount, todayBalance, extra = 100, 
 }
 
 /**
- * Con inversión, lo que cambia su rentabilidad (función fecha → €) si se ahorran `extra` € más al
- * mes desde el mes que viene: en los meses en que sobra menos que la aportación, esos euros la
- * completan y también rinden. Se calcula como un ingreso fijo de `extra` € desde el día 1 del mes
- * que viene. `lastMonth`, el último mes de la proyección larga.
+ * Con inversiones, lo que cambia su rentabilidad (función fecha → €) si se ahorran `extra` € más
+ * al mes desde el mes que viene: en los meses en que sobra menos que las aportaciones, esos euros
+ * las completan y también rinden. Se calcula como un ingreso fijo de `extra` € desde el día 1 del
+ * mes que viene. `lastMonth`, el último mes de la proyección larga.
  */
-export function extraSavingShift(investment, balanceDate, surplus, lastMonth, extra = 100, today = new Date()) {
+export function extraSavingShift(investments, balanceDate, surplus, lastMonth, extra = 100, today = new Date()) {
   const saving = {
     flow_type: 'IFM',
     amount: String(extra),
@@ -83,14 +83,14 @@ export function extraSavingShift(investment, balanceDate, surplus, lastMonth, ex
     end_date: null,
     duration_months: null,
   }
-  return investmentImpact(investment, balanceDate, surplus, surplusWith(surplus, saving, null, today), lastMonth).shift
+  return investmentImpact(investments, balanceDate, surplus, surplusWith(surplus, saving, null, today), lastMonth).shift
 }
 
 /**
  * Cómo cambia la fecha del objetivo si se añade `candidate` (y, al editar, se quita `previous`;
  * sin `candidate`, solo se quita: un flujo editado a 0 €).
  * `anchor` es la fecha del patrimonio inicial (`balance_date`, o null). `investmentShift` (fecha →
- * €), si hay inversión, es lo que cambia su rentabilidad porque el flujo cambia lo que se aporta
+ * €), si hay inversiones, es lo que cambia su rentabilidad porque el flujo cambia lo que se aporta
  * (`investmentImpact` en `lib/investment.js`). Devuelve `{ before, after, delta }` (meses; null si
  * alguna fecha no se alcanza).
  */

@@ -160,11 +160,6 @@ def load_settings(db: Session) -> models.Settings:
         balance_date=None,
         goal_name=None,
         goal_amount=None,
-        invest_amount=None,
-        invest_monthly=None,
-        invest_return=None,
-        invest_date=None,
-        invest_until=None,
         review_skipped=None,
     )
 
@@ -194,6 +189,50 @@ def patch_settings(payload: schemas.SettingsPatch, db: DbSession) -> models.Sett
     db.commit()
     db.refresh(settings)
     return settings
+
+
+# --- Inversiones ------------------------------------------------------------------
+
+
+def get_investment_or_404(db: Session, investment_id: int) -> models.Investment:
+    investment = db.get(models.Investment, investment_id)
+    if investment is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, f"Inversión {investment_id} no encontrada")
+    return investment
+
+
+@private.get("/investments", response_model=list[schemas.InvestmentRead], tags=["inversiones"])
+def list_investments(db: DbSession) -> list[models.Investment]:
+    return list(db.scalars(select(models.Investment).order_by(models.Investment.id)))
+
+
+@private.post(
+    "/investments", response_model=schemas.InvestmentRead, status_code=status.HTTP_201_CREATED, tags=["inversiones"]
+)
+def create_investment(payload: schemas.InvestmentBase, db: DbSession) -> models.Investment:
+    investment = models.Investment(**payload.model_dump())
+    db.add(investment)
+    db.commit()
+    db.refresh(investment)
+    return investment
+
+
+@private.put("/investments/{investment_id}", response_model=schemas.InvestmentRead, tags=["inversiones"])
+def update_investment(investment_id: int, payload: schemas.InvestmentBase, db: DbSession) -> models.Investment:
+    """Sustituye la inversión (lo invertido pasa a contar desde `start_date`, normalmente hoy)."""
+    investment = get_investment_or_404(db, investment_id)
+    for field, value in payload.model_dump().items():
+        setattr(investment, field, value)
+    db.commit()
+    db.refresh(investment)
+    return investment
+
+
+@private.delete("/investments/{investment_id}", status_code=status.HTTP_204_NO_CONTENT, tags=["inversiones"])
+def delete_investment(investment_id: int, db: DbSession) -> Response:
+    db.delete(get_investment_or_404(db, investment_id))
+    db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 # --- Revisiones mensuales -------------------------------------------------------
@@ -245,13 +284,15 @@ def delete_review(review_id: int, db: DbSession) -> Response:
 
 @private.get("/backup", response_model=schemas.Backup, tags=["copia de seguridad"])
 def export_backup(db: DbSession) -> schemas.Backup:
-    """Todos los datos (ajustes, flujos y revisiones) para guardarlos en un archivo."""
+    """Todos los datos (ajustes, flujos, inversiones y revisiones) para guardarlos en un archivo."""
     flows = db.scalars(select(models.Flow).order_by(models.Flow.id))
+    investments = db.scalars(select(models.Investment).order_by(models.Investment.id))
     reviews = db.scalars(select(models.Review).order_by(models.Review.review_date))
     return schemas.Backup(
         exported_on=date.today(),
         settings=schemas.BackupSettings.model_validate(load_settings(db), from_attributes=True),
         flows=[schemas.FlowCreate.model_validate(flow, from_attributes=True) for flow in flows],
+        investments=[schemas.InvestmentBase.model_validate(item, from_attributes=True) for item in investments],
         reviews=[schemas.ReviewBase.model_validate(review, from_attributes=True) for review in reviews],
     )
 
@@ -260,14 +301,18 @@ def export_backup(db: DbSession) -> schemas.Backup:
 def import_backup(payload: schemas.Backup, db: DbSession) -> schemas.BackupResult:
     """Sustituye todos los datos por los de la copia, de una vez: si algo falla, no cambia nada."""
     db.execute(delete(models.Flow))
+    db.execute(delete(models.Investment))
     db.execute(delete(models.Review))
     db.add_all(models.Flow(**flow.model_dump()) for flow in payload.flows)
+    db.add_all(models.Investment(**item.model_dump()) for item in payload.investments)
     db.add_all(models.Review(**review.model_dump()) for review in payload.reviews)
     settings = db.merge(load_settings(db))
     for field, value in payload.settings.model_dump().items():
         setattr(settings, field, value)
     db.commit()
-    return schemas.BackupResult(flows=len(payload.flows), reviews=len(payload.reviews))
+    return schemas.BackupResult(
+        flows=len(payload.flows), investments=len(payload.investments), reviews=len(payload.reviews)
+    )
 
 
 # --- Proyección de patrimonio ------------------------------------------------

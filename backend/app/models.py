@@ -64,8 +64,8 @@ class Settings(Base):
     `initial_balance` es el patrimonio neto al empezar `balance_date`, antes de los
     movimientos de ese día. Sin fecha, es el patrimonio previo a cualquier flujo.
     `goal_name` y `goal_amount` son el objetivo de patrimonio (p. ej. «Entrada piso», 20.000 €).
-    `invest_*` describen la parte invertida del patrimonio: lo invertido en `invest_date`, lo que
-    se aporta cada mes (hasta `invest_until`, si lo hay) y la rentabilidad anual esperada (en %). Solo esa parte genera rentabilidad.
+    `invest_*` es la única inversión de versiones anteriores: al arrancar se pasa a la tabla
+    `investments` (`migrations.py`) y se vacía; ya no se usa.
     `review_skipped` es el mes ('YYYY-MM') en que se pospuso la revisión mensual («Este mes no»).
     """
 
@@ -83,6 +83,26 @@ class Settings(Base):
     invest_until: Mapped[date | None] = mapped_column(Date, default=None)
     review_skipped: Mapped[str | None] = mapped_column(String(7), default=None)
     updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
+
+
+class Investment(Base):
+    """Una inversión (un fondo, unas acciones…): parte del patrimonio que crece con la rentabilidad.
+
+    `amount` es lo invertido en `start_date` (el día en que se guardó); `monthly`, lo que se aporta
+    el día 1 de cada mes desde el siguiente (hasta `until`, si lo hay), y `annual_return`, la
+    rentabilidad anual esperada (en %). Lo que se aporta sale de lo que sobra cada mes.
+    """
+
+    __tablename__ = "investments"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(60))
+    amount: Mapped[Decimal] = mapped_column(Numeric(14, 2))
+    monthly: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=Decimal(0))
+    annual_return: Mapped[Decimal] = mapped_column(Numeric(5, 2))
+    start_date: Mapped[date] = mapped_column(Date)
+    until: Mapped[date | None] = mapped_column(Date, default=None)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
 
 class Review(Base):
