@@ -1,4 +1,6 @@
 import { flowDates, FLOW_TYPES } from '@/lib/flowTypes'
+import { toISODate } from '@/lib/format'
+import { investmentImpact, surplusWith } from '@/lib/investment'
 
 /**
  * Objetivo de patrimonio. Todo sale de la proyección mensual larga (`long` en
@@ -50,10 +52,11 @@ function flowContribution(flow, points, anchor) {
  * Previsión del objetivo:
  * - `reached`: ya se tiene (patrimonio de hoy ≥ objetivo).
  * - `month`: primer mes en que se llega (null si no se llega en 40 años).
- * - `monthWithExtra`: el mismo, ahorrando `extra` € más al mes desde el mes que viene.
+ * - `monthWithExtra`: el mismo, ahorrando `extra` € más al mes desde el mes que viene. Con
+ *   inversión, `extraShift` (`extraSavingShift`) añade lo que rendiría esa parte que se invierte.
  * - `progress`: patrimonio de hoy / objetivo (0–1).
  */
-export function goalForecast(longPoints, goalAmount, todayBalance, extra = 100) {
+export function goalForecast(longPoints, goalAmount, todayBalance, extra = 100, extraShift = null) {
   const goal = Number(goalAmount)
   const progress = Math.max(0, Math.min(1, Number(todayBalance) / goal))
   const reached = Number(todayBalance) >= goal
@@ -61,9 +64,26 @@ export function goalForecast(longPoints, goalAmount, todayBalance, extra = 100) 
   const monthWithExtra = firstMonthReaching(
     longPoints,
     goal,
-    longPoints.map((_, i) => cents(extra) * i),
+    longPoints.map((p, i) => cents(extra) * i + (extraShift ? cents(extraShift(p.period_end)) : 0)),
   )
   return { reached, month, monthWithExtra, progress }
+}
+
+/**
+ * Con inversión, lo que cambia su rentabilidad (función fecha → €) si se ahorran `extra` € más al
+ * mes desde el mes que viene: en los meses en que sobra menos que la aportación, esos euros la
+ * completan y también rinden. Se calcula como un ingreso fijo de `extra` € desde el día 1 del mes
+ * que viene. `lastMonth`, el último mes de la proyección larga.
+ */
+export function extraSavingShift(investment, balanceDate, surplus, lastMonth, extra = 100, today = new Date()) {
+  const saving = {
+    flow_type: 'IFM',
+    amount: String(extra),
+    start_date: toISODate(new Date(today.getFullYear(), today.getMonth() + 1, 1)),
+    end_date: null,
+    duration_months: null,
+  }
+  return investmentImpact(investment, balanceDate, surplus, surplusWith(surplus, saving, null, today), lastMonth).shift
 }
 
 /**

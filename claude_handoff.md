@@ -14,7 +14,7 @@ Notas para retomar **finan** sin contexto previo. Antes de nada, lee `CLAUDE.md`
   6. **Lo fusiona Claude**: el usuario lo autorizó.
 - **Antes de cada PR:** `pnpm lint` y `pnpm build` en `frontend/`, prueba en el navegador con Playwright (móvil 390×844 y PC 1280×900, a veces también 320 y 360 de ancho), y `CLAUDE.md` actualizado con lo que cambie.
 - **Al terminar:** un resumen corto y claro en español, sin jerga técnica. Si algo no se pudo probar, se dice.
-- El usuario prueba en su **iPhone (Safari)** sobre el despliegue de Vercel y manda capturas. Lo que en Chromium va bien puede fallar en iOS (ver «Particularidades de iOS»).
+- El usuario prueba en su **iPhone 16 Pro (Safari)** sobre el despliegue de Vercel y manda capturas. Lo que en Chromium va bien puede fallar en iOS (ver «Particularidades de iOS»).
 
 ## Gustos del usuario (aprendidos por el camino)
 
@@ -49,6 +49,7 @@ Todo está fusionado en `main` y no hay trabajo a medias. Últimos PR:
 | #55 | Copia de seguridad: exportar e importar en Ajustes → Datos |
 | #56 | «Así te afecta» recalcula la inversión y avisa de lo que se deja de invertir; «Este mes no» en el servidor; lo que sobra cada mes, de los flujos |
 | #57 | Historial de revisiones mensuales (en el modal de la revisión y en Ajustes → Revisiones) |
+| #58 | «Con 100 €/mes más» cuenta lo que rendirían esos euros si completan aportaciones a la inversión |
 
 El usuario confirmó que #53 se ve bien en su iPhone. Falta que confirme en el iPhone que «Guardar copia» abre la hoja de compartir (o descarga) y que «Elegir archivo…» deja escoger el `.json` desde Archivos.
 
@@ -112,8 +113,7 @@ Los scripts de prueba de sesiones anteriores vivían en el scratchpad y **no se 
 
 ## Limitaciones conocidas y cosas sin probar
 
-- **Pantallas bajas en móvil (≈667 px o menos, iPhone SE/8):** la gráfica tiene un alto mínimo (`min-h-40`) y, con la barra de la revisión, no cabe todo: la gráfica queda encima de la barra y no deja tocarla. Viene de #44. Pendiente de preguntar al usuario qué iPhone tiene antes de tocarlo.
-- **«Con 100 €/mes más»** (tarjeta del objetivo): suma 100 €/mes al patrimonio, pero no recalcula si esos 100 € completarían una aportación recortada a la inversión. Solo cambia algo si algún mes sobra menos que la aportación. No se ha pedido.
+- **Pantallas bajas en móvil (≈667 px o menos, iPhone SE/8):** la gráfica tiene un alto mínimo (`min-h-40`) y, con la barra de la revisión, no cabe todo: la gráfica queda encima de la barra y no deja tocarla. Viene de #44. El usuario tiene un iPhone 16 Pro (402×874, no le afecta), así que no se ha arreglado.
 
 ## Ideas que quedaron sobre la mesa
 

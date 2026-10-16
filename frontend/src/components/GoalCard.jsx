@@ -3,7 +3,8 @@ import { Target } from 'lucide-react'
 import { Card } from '@/components/ui/card'
 import { useFinanceData } from '@/hooks/useFinanceData'
 import { formatEURWhole, formatMonthYear } from '@/lib/format'
-import { goalForecast } from '@/lib/goal'
+import { extraSavingShift, goalForecast } from '@/lib/goal'
+import { investmentOf } from '@/lib/investment'
 import { cn } from '@/lib/utils'
 
 /** Fecha prevista del objetivo en texto: «abril de 2029», o lo que corresponda si no hay fecha. */
@@ -17,7 +18,7 @@ function goalWhen(forecast, { long = true } = {}) {
  * más. Sin objetivo, invita a definirlo (`onEdit` abre Ajustes).
  */
 export function GoalCard({ onEdit, className }) {
-  const { settings, projections } = useFinanceData()
+  const { settings, projections, surplus } = useFinanceData()
   const goal = settings.data?.goal_amount
   const long = projections.data?.long
   const today = projections.data?.todayBalance
@@ -41,7 +42,12 @@ export function GoalCard({ onEdit, className }) {
     )
   }
 
-  const forecast = goalForecast(long, goal, today)
+  // «Con 100 €/mes más»: con inversión, esos euros también pueden completar aportaciones y rendir.
+  const investment = surplus ? investmentOf(settings.data) : null
+  const extraShift = investment
+    ? extraSavingShift(investment, settings.data.balance_date, surplus, long.at(-1).period)
+    : null
+  const forecast = goalForecast(long, goal, today, 100, extraShift)
   const when = goalWhen(forecast)
   const withExtra = forecast.monthWithExtra && forecast.monthWithExtra !== forecast.month
 
