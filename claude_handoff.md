@@ -50,6 +50,7 @@ Todo está fusionado en `main` y no hay trabajo a medias. Últimos PR:
 | #56 | «Así te afecta» recalcula la inversión y avisa de lo que se deja de invertir; «Este mes no» en el servidor; lo que sobra cada mes, de los flujos |
 | #57 | Historial de revisiones mensuales (en el modal de la revisión y en Ajustes → Revisiones) |
 | #58 | «Con 100 €/mes más» cuenta lo que rendirían esos euros si completan aportaciones a la inversión |
+| #59 | Editar un flujo a 0 €: «Así te afecta» muestra cómo queda sin él y guardar lo elimina (con confirmación) |
 
 El usuario confirmó que #53 se ve bien en su iPhone. Falta que confirme en el iPhone que «Guardar copia» abre la hoja de compartir (o descarga) y que «Elegir archivo…» deja escoger el `.json` desde Archivos.
 

@@ -49,11 +49,11 @@ export function monthlySurplus(flows, today = new Date()) {
   return new Map([...cents].map(([month, value]) => [month, value / 100]))
 }
 
-/** Lo que sobraría cada mes con el flujo `add` (y, al editar, sin el original, `remove`). */
+/** Lo que sobraría cada mes con el flujo `add` (y, al editar, sin el original, `remove`; sin `add`, solo sin él). */
 export function surplusWith(surplus, add, remove = null, today = new Date()) {
   const until = horizonOf(today)
   const cents = new Map([...surplus].map(([month, value]) => [month, Math.round(value * 100)]))
-  addFlow(cents, add, until)
+  if (add) addFlow(cents, add, until)
   if (remove) addFlow(cents, remove, until, -1)
   return new Map([...cents].map(([month, value]) => [month, value / 100]))
 }
