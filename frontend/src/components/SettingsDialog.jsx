@@ -24,6 +24,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { useAuth } from '@/hooks/useAuth'
 import { useApiQuery, useFinanceData } from '@/hooks/useFinanceData'
 import { useTheme } from '@/hooks/useTheme'
@@ -475,11 +476,21 @@ function BackupSetting() {
   )
 }
 
-/** Objetivo de patrimonio: nombre e importe. Vacío el importe, se quita. */
+const GOAL_BASES = [
+  { value: 'all', label: 'Todo tu patrimonio' },
+  { value: 'invested', label: 'Solo lo invertido' },
+]
+
+/**
+ * Objetivo de patrimonio: nombre, importe y lo que cuenta para llegar (todo el patrimonio o solo
+ * lo que valen las inversiones; con esto último, la gráfica muestra lo invertido). Vacío el
+ * importe, se quita.
+ */
 function GoalForm({ settings }) {
-  const { refresh } = useFinanceData()
+  const { refresh, investments } = useFinanceData()
   const [name, setName] = useState(settings.goal_name ?? '')
   const [amount, setAmount] = useState(settings.goal_amount ?? '')
+  const [basis, setBasis] = useState(settings.goal_basis === 'invested' ? 'invested' : 'all')
   const [status, setStatus] = useState('idle') // idle | saving | saved
   const [error, setError] = useState(null)
   const edit = (setter) => (event) => {
@@ -503,7 +514,7 @@ function GoalForm({ settings }) {
   function handleSubmit(event) {
     event.preventDefault()
     const value = String(amount).trim().replace(',', '.')
-    save({ goal_name: name.trim() || null, goal_amount: value === '' ? null : value })
+    save({ goal_name: name.trim() || null, goal_amount: value === '' ? null : value, goal_basis: basis })
   }
 
   function handleRemove() {
@@ -531,6 +542,34 @@ function GoalForm({ settings }) {
             onChange={edit(setAmount)}
           />
         </div>
+      </div>
+      <div className="grid gap-2">
+        <Label id="goal-basis-label">Para llegar cuenta</Label>
+        <ToggleGroup
+          type="single"
+          variant="outline"
+          value={basis}
+          onValueChange={(next) => {
+            if (!next) return
+            setBasis(next)
+            setStatus('idle')
+          }}
+          aria-labelledby="goal-basis-label"
+          className="w-full"
+        >
+          {GOAL_BASES.map((option) => (
+            <ToggleGroupItem key={option.value} value={option.value} className="text-xs">
+              {option.label}
+            </ToggleGroupItem>
+          ))}
+        </ToggleGroup>
+        <p className="text-muted-foreground text-xs leading-relaxed">
+          {basis === 'all'
+            ? 'Todo lo que tienes: lo ahorrado y lo invertido.'
+            : investments.list?.length
+              ? 'Solo lo que valen tus inversiones (lo invertido, lo que aportas y lo que ganan). La gráfica muestra eso en vez de todo tu patrimonio.'
+              : 'Solo lo que valen tus inversiones. Aún no tienes ninguna: hasta que añadas una, no avanzas.'}
+        </p>
       </div>
       {error && (
         <p role="alert" className="text-destructive text-sm">
@@ -646,7 +685,7 @@ const PAGES = {
   goal: {
     title: 'Objetivo',
     description:
-      'El patrimonio al que quieres llegar (un colchón, la entrada de un piso…). finan lo marca en la gráfica con una línea azul, te dice cuándo llegas y, al añadir un gasto o un ingreso, cuánto lo adelanta o lo retrasa.',
+      'El patrimonio al que quieres llegar (un colchón, la entrada de un piso…). finan lo marca en la gráfica con una línea azul, te dice cuándo llegas y, al añadir un gasto o un ingreso, cuánto lo adelanta o lo retrasa. Puede contar todo lo que tienes o solo lo que valen tus inversiones.',
     Content: GoalSetting,
   },
   reviews: {
@@ -729,7 +768,9 @@ function summaries(settings, chart, reviews) {
     goal: !settings
       ? null
       : settings.goal_amount
-        ? `${settings.goal_name || 'Objetivo'} · ${formatEURWhole(settings.goal_amount)}`
+        ? `${settings.goal_name || 'Objetivo'} · ${formatEURWhole(settings.goal_amount)}${
+            settings.goal_basis === 'invested' ? ' · solo lo invertido' : ''
+          }`
         : 'Sin definir',
     reviews: !reviews
       ? null

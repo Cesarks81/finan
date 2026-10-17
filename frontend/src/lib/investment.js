@@ -222,17 +222,41 @@ export function portfolio(investments, surplus) {
   }
 }
 
+/** Lo que valen todas las inversiones de una cartera (`portfolio`) en la fecha `iso`. */
+function totalValue(wallet, investments, iso) {
+  return investments.reduce((sum, investment) => sum + wallet.value(investment, iso), 0)
+}
+
+/**
+ * Lo que cambia el valor de todas las inversiones (función fecha → €) si lo que sobra cada mes
+ * pasa de `before` a `after`: lo que se aporta de más o de menos y lo que eso rinde. Es lo que
+ * mueve un flujo un objetivo que cuenta solo lo invertido.
+ */
+export function investedShift(investments, before, after) {
+  const from = portfolio(investments, before)
+  const to = portfolio(investments, after)
+  return (iso) => totalValue(to, investments, iso) - totalValue(from, investments, iso)
+}
+
 /**
  * Proyecciones con la rentabilidad de las inversiones. Lo invertido y las aportaciones ya forman
  * parte del patrimonio (aportar es mover dinero ahorrado, no gastarlo), así que solo se suma lo
  * que rinden (`portfolio(…).adjust`). Las líneas de ingresos y gastos no cambian. `surplus` es lo
  * que sobra cada mes (`monthlySurplus`), el tope de las aportaciones.
+ * Cada punto lleva además `invested`, lo que valen todas las inversiones al final de su periodo
+ * (lo invertido, lo aportado y lo ganado), y `todayInvested` lo que valen hoy: es lo que cuenta
+ * para un objetivo de «solo lo invertido».
  */
 export function withInvestments(projections, investments, balanceDate, surplus, today = new Date()) {
   if (!investments.length) return projections
-  const adjust = portfolio(investments, surplus).adjust(balanceDate)
+  const wallet = portfolio(investments, surplus)
+  const adjust = wallet.adjust(balanceDate)
   const points = (list) =>
-    list.map((p) => ({ ...p, balance: (Number(p.balance) + adjust(p.period_end)).toFixed(2) }))
+    list.map((p) => ({
+      ...p,
+      balance: (Number(p.balance) + adjust(p.period_end)).toFixed(2),
+      invested: totalValue(wallet, investments, p.period_end).toFixed(2),
+    }))
   const view = (data) => ({ ...data, points: points(data.points) })
   return {
     ...projections,
@@ -244,6 +268,7 @@ export function withInvestments(projections, investments, balanceDate, surplus, 
       projections.todayBalance === undefined
         ? undefined
         : (Number(projections.todayBalance) + adjust(toISODate(today))).toFixed(2),
+    todayInvested: totalValue(wallet, investments, toISODate(today)).toFixed(2),
   }
 }
 

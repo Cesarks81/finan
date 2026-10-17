@@ -3,7 +3,7 @@ import { Target } from 'lucide-react'
 import { Card } from '@/components/ui/card'
 import { useFinanceData } from '@/hooks/useFinanceData'
 import { formatEURWhole, formatMonthYear } from '@/lib/format'
-import { extraSavingShift, goalForecast } from '@/lib/goal'
+import { extraInvestedShift, extraSavingShift, goalBasis, goalForecast, goalPoints, goalToday } from '@/lib/goal'
 import { cn } from '@/lib/utils'
 
 /** Fecha prevista del objetivo en texto: «abril de 2029», o lo que corresponda si no hay fecha. */
@@ -14,13 +14,15 @@ function goalWhen(forecast, { long = true } = {}) {
 
 /**
  * Tarjeta del objetivo (PC): progreso, cuándo se llega y cuándo se llegaría ahorrando 100 €/mes
- * más. Sin objetivo, invita a definirlo (`onEdit` abre Ajustes).
+ * más, con todo el patrimonio o solo con lo invertido (`goalBasis`). Sin objetivo, invita a
+ * definirlo (`onEdit` abre Ajustes).
  */
 export function GoalCard({ onEdit, className }) {
   const { settings, projections, surplus, investments } = useFinanceData()
   const goal = settings.data?.goal_amount
+  const basis = goalBasis(settings.data)
   const long = projections.data?.long
-  const today = projections.data?.todayBalance
+  const today = projections.data ? goalToday(projections.data, basis) : undefined
 
   if (!settings.data || !long || today === undefined) return null
 
@@ -42,11 +44,14 @@ export function GoalCard({ onEdit, className }) {
   }
 
   // «Con 100 €/mes más»: con inversiones, esos euros también pueden completar aportaciones y rendir.
-  const extraShift =
-    surplus && investments.list?.length
-      ? extraSavingShift(investments.list, settings.data.balance_date, surplus, long.at(-1).period)
-      : null
-  const forecast = goalForecast(long, goal, today, 100, extraShift)
+  // Si solo cuenta lo invertido, solo suma la parte que llega a invertirse (y lo que rinde).
+  const invested = surplus && investments.list?.length ? investments.list : null
+  const extraShift = !invested
+    ? null
+    : basis === 'invested'
+      ? extraInvestedShift(invested, surplus)
+      : extraSavingShift(invested, settings.data.balance_date, surplus, long.at(-1).period)
+  const forecast = goalForecast(goalPoints(long, basis), goal, today, basis === 'invested' ? 0 : 100, extraShift)
   const when = goalWhen(forecast)
   const withExtra = forecast.monthWithExtra && forecast.monthWithExtra !== forecast.month
 
@@ -62,8 +67,8 @@ export function GoalCard({ onEdit, className }) {
         </button>
       </div>
       <p className="text-muted-foreground m-0 text-[13px] tabular-nums">
-        <span className="text-foreground font-semibold">{formatEURWhole(Math.max(0, today))}</span> de{' '}
-        {formatEURWhole(goal)} · {Math.round(forecast.progress * 100)} %
+        <span className="text-foreground font-semibold">{formatEURWhole(Math.max(0, today))}</span>
+        {basis === 'invested' && ' invertidos'} de {formatEURWhole(goal)} · {Math.round(forecast.progress * 100)} %
       </p>
       <div aria-hidden="true" className="bg-border h-1.5 overflow-hidden rounded-full">
         <div className="bg-chart-1 h-1.5 rounded-full" style={{ width: `${forecast.progress * 100}%` }} />

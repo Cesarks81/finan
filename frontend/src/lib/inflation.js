@@ -16,7 +16,8 @@ function realPoints(points, rate, today) {
   return points.map((p) => {
     const factor = deflator(p.period_end, rate, today)
     const real = (value) => (Number(value) * factor).toFixed(2)
-    return { ...p, balance: real(p.balance), income: real(p.income), expense: real(p.expense), deflator: factor }
+    const invested = p.invested === undefined ? {} : { invested: real(p.invested) }
+    return { ...p, balance: real(p.balance), income: real(p.income), expense: real(p.expense), ...invested, deflator: factor }
   })
 }
 

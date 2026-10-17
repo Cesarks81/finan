@@ -76,6 +76,9 @@ class SettingsPatch(BaseModel):
     review_skipped: Annotated[str, Field(pattern=r"^\d{4}-(0[1-9]|1[0-2])$")] | None = Field(
         default=None, description="Mes (YYYY-MM) en que se pospuso la revisión mensual"
     )
+    goal_basis: Literal["all", "invested"] | None = Field(
+        default=None, description="Lo que cuenta para el objetivo: todo el patrimonio (all) o solo lo invertido"
+    )
 
 
 class SettingsRead(BaseModel):
@@ -85,6 +88,7 @@ class SettingsRead(BaseModel):
     balance_date: date | None
     goal_name: str | None = None
     goal_amount: Decimal | None = None
+    goal_basis: str | None = None
     review_skipped: str | None = None
 
 
