@@ -26,7 +26,7 @@ import {
   formatMonths,
   formatPeriod,
 } from '@/lib/format'
-import { goalForecast } from '@/lib/goal'
+import { goalBasis, goalForecast, goalPoints, goalToday } from '@/lib/goal'
 import { cushionMonths } from '@/lib/metrics'
 import { cn } from '@/lib/utils'
 
@@ -106,8 +106,11 @@ function splitLayers(points) {
   }
 }
 
-/** Puntos de /projection como números, con los ingresos y gastos acumulados desde el primero. */
-function toChartPoints(apiPoints) {
+/**
+ * Puntos de /projection como números, con los ingresos y gastos acumulados desde el primero. Con
+ * `invested`, el `balance` es lo que valen las inversiones (objetivo de solo lo invertido).
+ */
+function toChartPoints(apiPoints, invested = false) {
   // Acumulados en céntimos para no arrastrar errores de coma flotante.
   let incomeCents = 0
   let expenseCents = 0
@@ -116,7 +119,7 @@ function toChartPoints(apiPoints) {
     expenseCents += Math.round(Number(p.expense) * 100)
     return {
       period: p.period,
-      balance: Number(p.balance),
+      balance: Number(invested ? (p.invested ?? 0) : p.balance),
       income: Number(p.income),
       expense: Number(p.expense),
       incomeTotal: incomeCents / 100,
@@ -254,7 +257,7 @@ function TooltipAnchor({ points, splitLines, onChange }) {
   return null
 }
 
-function ChartTooltip({ active, payload, granularity, splitLines, lifted }) {
+function ChartTooltip({ active, payload, granularity, splitLines, invested, lifted }) {
   // Hasta saber a qué altura va (un fotograma) no se dibuja, para no aparecer en otro sitio.
   if (!active || !payload?.length || !lifted) return null
   const point = payload[0].payload
@@ -276,16 +279,17 @@ function ChartTooltip({ active, payload, granularity, splitLines, lifted }) {
     <div className={cn(box, 'min-w-44')}>
       <p className="font-medium">{formatPeriod(point.period, granularity, { long: true })}</p>
       <div className="flex justify-between gap-4">
-        <span className="text-muted-foreground">Patrimonio</span>
+        <span className="text-muted-foreground">{invested ? 'Invertido' : 'Patrimonio'}</span>
         <span className="font-semibold tabular-nums">{formatEUR(point.balance)}</span>
       </div>
-      {point.income > 0 && (
+      {/* Los ingresos y gastos son de todo el patrimonio: con lo invertido no se muestran. */}
+      {!invested && point.income > 0 && (
         <div className="flex justify-between gap-4">
           <span className="text-muted-foreground">Ingresos</span>
           <span className="text-income tabular-nums">+{formatEUR(point.income)}</span>
         </div>
       )}
-      {point.expense > 0 && (
+      {!invested && point.expense > 0 && (
         <div className="flex justify-between gap-4">
           <span className="text-muted-foreground">Gastos</span>
           <span className="text-expense tabular-nums">−{formatEUR(point.expense)}</span>
@@ -301,7 +305,9 @@ function ChartTooltip({ active, payload, granularity, splitLines, lifted }) {
  * en tarjeta, con ejes y rejilla.
  * Con el ajuste «Ingresos y gastos por separado» muestra en su lugar dos líneas: ingresos
  * (azul) y gastos (rojo) acumulados desde el inicio de la vista. Con «Vista de calendario»,
- * las ventanas son el mes y el año en curso (ver `lib/projections.js`).
+ * las ventanas son el mes y el año en curso (ver `lib/projections.js`). Con un objetivo de solo
+ * lo invertido (`goalBasis`), la línea es lo que valen las inversiones («Evolución inversiones»),
+ * para que cruzar la meta sea llegar a ella.
  */
 export function NetWorthChart({ className }) {
   const gradientId = useId()
@@ -352,7 +358,9 @@ export function NetWorthChart({ className }) {
   const { error, loading } = projections
   const data = projections.data?.[granularity]
 
-  const points = useMemo(() => toChartPoints(data?.points ?? []), [data])
+  const basis = goalBasis(settings.data)
+  const investedView = !splitLines && Boolean(settings.data?.goal_amount) && basis === 'invested'
+  const points = useMemo(() => toChartPoints(data?.points ?? [], investedView), [data, investedView])
   const layers = useMemo(() => splitLayers(points), [points])
   const todayBalance = projections.data?.todayBalance
   const ready = Boolean(flows.data) && todayBalance !== undefined
@@ -364,10 +372,10 @@ export function NetWorthChart({ className }) {
     clearTimeout(drawingTimer.current)
     drawingTimer.current = setTimeout(endDrawing, 1600)
     return () => clearTimeout(drawingTimer.current)
-  }, [points, granularity, splitLines, calendar, endDrawing])
+  }, [points, granularity, splitLines, investedView, calendar, endDrawing])
   const hasNegative = !splitLines && points.some((p) => p.balance < 0)
   // Solo en la vista de patrimonio y si se ha indicado un patrimonio inicial (con su fecha).
-  const initialBalance = !splitLines && data?.balance_date ? Number(data.initial_balance) : null
+  const initialBalance = !splitLines && !investedView && data?.balance_date ? Number(data.initial_balance) : null
 
   // Objetivo (vista de patrimonio): línea de meta con cuándo se llega. Si queda por encima de la
   // escala, su etiqueta se fija arriba con una flecha, para que se vea siempre.
@@ -375,9 +383,9 @@ export function NetWorthChart({ className }) {
   const goalForecastResult = useMemo(
     () =>
       goalAmount !== null && projections.data?.long && projections.data.todayBalance !== undefined
-        ? goalForecast(projections.data.long, goalAmount, projections.data.todayBalance)
+        ? goalForecast(goalPoints(projections.data.long, basis), goalAmount, goalToday(projections.data, basis))
         : null,
-    [goalAmount, projections.data],
+    [goalAmount, projections.data, basis],
   )
   const goalLabel =
     goalForecastResult &&
@@ -405,7 +413,7 @@ export function NetWorthChart({ className }) {
     >
       <CardHeader className="px-4 md:px-6">
         <CardTitle className="flex items-center gap-2 text-sm tracking-wide uppercase">
-          {splitLines ? 'Ingresos y gastos' : 'Evolución patrimonio'}
+          {splitLines ? 'Ingresos y gastos' : investedView ? 'Evolución inversiones' : 'Evolución patrimonio'}
           {/* Indicador discreto de actualización: aparece al instante y, al terminar, se queda un
               momento y se desvanece, para que se note aunque la recarga sea rápida. La gráfica
               sigue mostrando los datos anteriores y se puede usar mientras tanto. */}
@@ -453,7 +461,7 @@ export function NetWorthChart({ className }) {
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart
                   // Montar de nuevo al cambiar de vista (o de modo) repite la animación de la línea dibujándose.
-                  key={`${granularity}-${splitLines}-${calendar}`}
+                  key={`${granularity}-${splitLines}-${investedView}-${calendar}`}
                   data={points}
                   // PC: el mismo margen a los dos lados, alineado con el título (los importes ocupan solo lo que necesitan).
                   margin={isDesktop ? { top: 16, right: 8, left: 8, bottom: 0 } : { top: 16, right: 0, left: 0, bottom: 0 }}
@@ -503,7 +511,14 @@ export function NetWorthChart({ className }) {
                     allowEscapeViewBox={{ x: false, y: true }}
                     isAnimationActive={tooltipGlides}
                     animationDuration={150}
-                    content={<ChartTooltip granularity={granularity} splitLines={splitLines} lifted={tooltipTop !== null} />}
+                    content={
+                      <ChartTooltip
+                        granularity={granularity}
+                        splitLines={splitLines}
+                        invested={investedView}
+                        lifted={tooltipTop !== null}
+                      />
+                    }
                     cursor={{ stroke: 'var(--muted-foreground)', strokeDasharray: '3 3' }}
                   />
                   {hasNegative && <ReferenceLine y={0} stroke="var(--expense)" strokeOpacity={0.5} />}
@@ -551,7 +566,7 @@ export function NetWorthChart({ className }) {
                     <Area
                       type="monotone"
                       dataKey="balance"
-                      name="Patrimonio"
+                      name={investedView ? 'Invertido' : 'Patrimonio'}
                       stroke="var(--chart-1)"
                       strokeWidth={2}
                       fill={`url(#${gradientId}-balance)`}

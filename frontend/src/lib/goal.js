@@ -1,6 +1,6 @@
 import { flowDates, FLOW_TYPES } from '@/lib/flowTypes'
 import { toISODate } from '@/lib/format'
-import { investmentImpact, surplusWith } from '@/lib/investment'
+import { investedShift, investmentImpact, surplusWith } from '@/lib/investment'
 
 /**
  * Objetivo de patrimonio. Todo sale de la proyección mensual larga (`long` en
@@ -9,6 +9,25 @@ import { investmentImpact, surplusWith } from '@/lib/investment'
  */
 
 const cents = (value) => Math.round(Number(value) * 100)
+
+/**
+ * Lo que cuenta para el objetivo (`settings.goal_basis`): 'all', todo el patrimonio (por defecto),
+ * o 'invested', solo lo que valen las inversiones (lo invertido, lo aportado y lo ganado).
+ */
+export const goalBasis = (settings) => (settings?.goal_basis === 'invested' ? 'invested' : 'all')
+
+/**
+ * Los puntos de una proyección con lo que cuenta para el objetivo en `balance`: tal cual, o con lo
+ * que valen las inversiones (`invested`, que pone `withInvestments`; sin inversiones, 0).
+ */
+export function goalPoints(points, basis) {
+  return basis === 'invested' ? points.map((p) => ({ ...p, balance: p.invested ?? '0' })) : points
+}
+
+/** Lo que cuenta hoy para el objetivo: el patrimonio de hoy o lo que valen hoy las inversiones. */
+export function goalToday(projections, basis) {
+  return basis === 'invested' ? (projections.todayInvested ?? '0') : projections.todayBalance
+}
 
 /** Primer mes ('YYYY-MM') en que el patrimonio llega a `goal`, o null si no llega en el horizonte. */
 function firstMonthReaching(points, goal, adjust) {
@@ -76,14 +95,28 @@ export function goalForecast(longPoints, goalAmount, todayBalance, extra = 100, 
  * mes que viene. `lastMonth`, el último mes de la proyección larga.
  */
 export function extraSavingShift(investments, balanceDate, surplus, lastMonth, extra = 100, today = new Date()) {
-  const saving = {
+  const after = surplusWith(surplus, extraSaving(extra, today), null, today)
+  return investmentImpact(investments, balanceDate, surplus, after, lastMonth).shift
+}
+
+/** Ahorrar `extra` € más al mes desde el mes que viene, como un ingreso fijo desde el día 1. */
+function extraSaving(extra, today) {
+  return {
     flow_type: 'IFM',
     amount: String(extra),
     start_date: toISODate(new Date(today.getFullYear(), today.getMonth() + 1, 1)),
     end_date: null,
     duration_months: null,
   }
-  return investmentImpact(investments, balanceDate, surplus, surplusWith(surplus, saving, null, today), lastMonth).shift
+}
+
+/**
+ * Lo mismo para un objetivo de solo lo invertido: lo que cambia el valor de las inversiones si se
+ * ahorran `extra` € más al mes desde el mes que viene (solo cuenta lo que llega a aportarse, si
+ * completa aportaciones, y lo que rinde). Se usa con `extra` 0 en `goalForecast`.
+ */
+export function extraInvestedShift(investments, surplus, extra = 100, today = new Date()) {
+  return investedShift(investments, surplus, surplusWith(surplus, extraSaving(extra, today), null, today))
 }
 
 /**

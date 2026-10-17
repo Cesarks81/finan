@@ -18,8 +18,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useFinanceData } from '@/hooks/useFinanceData'
 import { FIXED_TYPES, FLOW_ORDER, FLOW_TYPES, VARIABLE_TYPES, isRecurringFlow } from '@/lib/flowTypes'
 import { formatEURWhole, formatMonthYear, toISODate } from '@/lib/format'
-import { goalImpact } from '@/lib/goal'
-import { investmentImpact, surplusWith } from '@/lib/investment'
+import { goalBasis, goalImpact, goalPoints, goalToday } from '@/lib/goal'
+import { investedShift, investmentImpact, surplusWith } from '@/lib/investment'
 import { cn } from '@/lib/utils'
 
 // Periodicidad de un flujo variable (GVM / IVM): puntual o temporal (durante N meses / hasta una fecha).
@@ -131,9 +131,10 @@ function contributionText(change) {
 
 /**
  * «Así te afecta»: cómo cambian, con el flujo del formulario (al editar, en lugar del original),
- * la fecha del objetivo y, si hay inversión, lo que se invierte: cada mes se aporta como mucho lo
- * que sobra, así que un gasto puede recortar las aportaciones (y lo que rinden) y un ingreso
- * completarlas. Nada si no cambia ninguna de las dos o si el formulario aún no está completo.
+ * la fecha del objetivo (con todo el patrimonio o solo con lo invertido, `goalBasis`) y, si hay
+ * inversión, lo que se invierte: cada mes se aporta como mucho lo que sobra, así que un gasto
+ * puede recortar las aportaciones (y lo que rinden) y un ingreso completarlas. Nada si no cambia
+ * ninguna de las dos o si el formulario aún no está completo.
  */
 function ImpactPreview({ form, flow }) {
   const { settings, projections, surplus, investments } = useFinanceData()
@@ -151,15 +152,22 @@ function ImpactPreview({ form, flow }) {
 
   const candidateFlow = removing ? null : { ...candidate, is_recurring: isRecurringFlow(candidate) }
   const balanceDate = settings.data.balance_date
-  const invest =
-    surplus && investments.list?.length
-      ? investmentImpact(investments.list, balanceDate, surplus, surplusWith(surplus, candidateFlow, flow), long.at(-1).period)
-      : null
+  const list = surplus && investments.list?.length ? investments.list : null
+  const after = list ? surplusWith(surplus, candidateFlow, flow) : null
+  const invest = list ? investmentImpact(list, balanceDate, surplus, after, long.at(-1).period) : null
   const change = invest?.change && Math.abs(invest.change.total) >= 1 ? invest.change : null
 
+  // Si el objetivo cuenta solo lo invertido, el flujo solo lo mueve por lo que cambia lo que se
+  // aporta (y lo que eso rinde); sin inversiones, no lo mueve.
   const goal = settings.data.goal_amount
-  const reached = Number(projections.data.todayBalance) >= Number(goal)
-  const goalChange = goal && !reached ? goalImpact(long, goal, candidateFlow, flow, balanceDate, invest?.shift) : null
+  const basis = goalBasis(settings.data)
+  const reached = Number(goalToday(projections.data, basis)) >= Number(goal)
+  const goalChange =
+    !goal || reached
+      ? null
+      : basis === 'invested'
+        ? list && goalImpact(goalPoints(long, basis), goal, null, null, null, investedShift(list, surplus, after))
+        : goalImpact(long, goal, candidateFlow, flow, balanceDate, invest?.shift)
   const showGoal = goalChange && goalChange.before !== goalChange.after
   if (!showGoal && !change) return null
   const text = (month) => (month ? formatMonthYear(month) : 'más de 40 años')

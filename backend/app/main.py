@@ -160,6 +160,7 @@ def load_settings(db: Session) -> models.Settings:
         balance_date=None,
         goal_name=None,
         goal_amount=None,
+        goal_basis=None,
         review_skipped=None,
     )
 

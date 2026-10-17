@@ -63,7 +63,9 @@ class Settings(Base):
 
     `initial_balance` es el patrimonio neto al empezar `balance_date`, antes de los
     movimientos de ese día. Sin fecha, es el patrimonio previo a cualquier flujo.
-    `goal_name` y `goal_amount` son el objetivo de patrimonio (p. ej. «Entrada piso», 20.000 €).
+    `goal_name` y `goal_amount` son el objetivo de patrimonio (p. ej. «Entrada piso», 20.000 €), y
+    `goal_basis` lo que cuenta para llegar a él: todo el patrimonio (null o 'all') o solo lo que
+    valen las inversiones ('invested').
     `invest_*` es la única inversión de versiones anteriores: al arrancar se pasa a la tabla
     `investments` (`migrations.py`) y se vacía; ya no se usa.
     `review_skipped` es el mes ('YYYY-MM') en que se pospuso la revisión mensual («Este mes no»).
@@ -75,6 +77,7 @@ class Settings(Base):
     initial_balance: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=Decimal(0))
     balance_date: Mapped[date | None] = mapped_column(Date, default=None)
     goal_name: Mapped[str | None] = mapped_column(String(60), default=None)
+    goal_basis: Mapped[str | None] = mapped_column(String(10), default=None)
     goal_amount: Mapped[Decimal | None] = mapped_column(Numeric(14, 2), default=None)
     invest_amount: Mapped[Decimal | None] = mapped_column(Numeric(14, 2), default=None)
     invest_monthly: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), default=None)
